@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RJ Tasks for Teachers</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="RJ Tasks for Teachers is a Microsoft Edge extension for Regis Jesuit teachers: what's waiting to be graded, course setup problems, students with missing work, and your week, right inside Canvas.">
+<link rel="icon" type="image/png" href="assets/icon-48.png">
+<meta property="og:title" content="RJ Tasks for Teachers">
+<meta property="og:description" content="What's waiting to be graded, course setup problems, students with missing work, and your week, right inside Canvas.">
+<meta property="og:image" content="assets/shot-1-to-grade.webp">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <span class="who">Regis Jesuit · Ed Tech</span>
+    <nav aria-label="Page sections">
+      <a href="#overview">Overview</a>
+      <a href="#install">Install</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#help">Help</a>
+      <a href="#ideas">Report a bug</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="listing">
+      <img class="icon" src="assets/icon-128.png" width="96" height="96" alt="RJ Tasks for Teachers icon">
+      <div>
+        <h1>RJ Tasks for Teachers</h1>
+        <p class="publisher">Offered by <strong>Regis Jesuit High School Ed Tech</strong></p>
+        <div class="chips">
+          <span class="chip">Microsoft Edge</span>
+          <span class="chip">Works only on rjhs.instructure.com</span>
+          <span class="chip">Read-only</span>
+          <span class="chip">No data collected</span>
+        </div>
+      </div>
+      <div class="get">
+        <a class="btn" href="#install">Get RJ Tasks for Teachers</a>
+        <a class="btn secondary" href="downloads/{{ZIP}}" download>Download .zip ({{ZIPKB}} KB)</a>
+        <small>Version {{VERSION}} · Free for RJ faculty and staff</small>
+      </div>
+    </div>
+
+    <div class="shots" role="region" aria-label="Screenshots" tabindex="0">
+      <figure><img src="assets/shot-1-to-grade.webp" width="1280" height="800" alt="Canvas dashboard with the RJ Tasks for Teachers panel open on To grade: 15 submissions in 4 assignments, oldest first, each with an Open SpeedGrader button" loading="eager"><figcaption>To grade: oldest wait first, one click to SpeedGrader</figcaption></figure>
+      <figure><img src="assets/shot-2-check-up.webp" width="1280" height="800" alt="Check-up tab listing setup problems: group weights add up to 90 percent, an unpublished test that is due Saturday, and a lab that locks before it is due" loading="lazy"><figcaption>Check-up: setup problems students would trip over</figcaption></figure>
+      <figure><img src="assets/shot-3-students.webp" width="1280" height="800" alt="Students tab with names hidden: ALGEBRA 1, 2 students with at least 3 missing, and a Show names button" loading="lazy"><figcaption>Students to check on, names hidden until you ask</figcaption></figure>
+      <figure><img src="assets/shot-4-week.webp" width="1280" height="800" alt="Week tab listing what is due each day, with a flag that Algebra 1 has 2 graded items due tomorrow" loading="lazy"><figcaption>Your week, with heavy days flagged</figcaption></figure>
+      <figure><img src="assets/shot-5-dark.webp" width="1280" height="800" alt="The panel in dark mode" loading="lazy"><figcaption>Follows dark mode</figcaption></figure>
+      <figure><img src="assets/shot-6-settings.webp" width="1280" height="822" alt="Settings page: missing-work threshold, hide names, which classes to include, and where the button appears" loading="lazy"><figcaption>Simple settings</figcaption></figure>
+    </div>
+    <p class="shots-note">Screenshots use sample classes, assignments and made-up student names.</p>
+
+    <div class="body">
+      <div class="main">
+        <section id="overview" aria-labelledby="overview-title">
+          <h2 id="overview-title">Overview</h2>
+          <p class="lede">RJ Tasks for Teachers answers one question inside Canvas: what needs my attention across my classes? A <strong>My Classes</strong> button opens a panel for all your classes, or just the one you're in. It only reads Canvas. It never changes anything there.</p>
+          <div class="features">
+            <div class="feature">
+              <h3>To grade</h3>
+              <p>Every assignment with submissions waiting, across all your sections, oldest wait first. Late, resubmitted and quiz answers to review are marked. One click opens SpeedGrader.</p>
+            </div>
+            <div class="feature">
+              <h3>Check-up</h3>
+              <p>Catches setup problems before students do: no due date, unpublished work that's due, a lock date before the due date, 0-point assignments, 12:00 AM due times, and group weights that don't add up to 100%.</p>
+            </div>
+            <div class="feature">
+              <h3>Students to check on</h3>
+              <p>Students with three or more missing assignments this grading period (you pick the number), using Canvas's own Missing flag. Copy the list for an email or advisor note.</p>
+            </div>
+            <div class="feature">
+              <h3>Your week</h3>
+              <p>What's due from your classes each of the next seven days. Any day where one class or section has two or more graded items due is flagged, so you can spread things out.</p>
+            </div>
+            <div class="feature">
+              <h3>Safe to project</h3>
+              <p>Student names stay hidden until you click <strong>Show names</strong>, and hide again when you close the panel. The button stays out of SpeedGrader and the Gradebook.</p>
+            </div>
+            <div class="feature">
+              <h3>Read-only</h3>
+              <p>It reads what you can already see in Canvas and changes nothing. Ignoring a check-up item only hides it on your computer.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="install" aria-labelledby="install-title">
+          <h2 id="install-title">Install</h2>
+          <div class="paths">
+            <div class="path primary">
+              <span class="tag">On an RJ faculty laptop</span>
+              <h3>Nothing to install</h3>
+              <p>Ed Tech turns RJ Tasks for Teachers on for faculty laptops in Microsoft Edge. Once it reaches yours, open Canvas and look for the <strong>My Classes</strong> button in the bottom-right corner.</p>
+            </div>
+            <div class="path">
+              <span class="tag">Testing it, or on another computer</span>
+              <h3>Install it yourself</h3>
+              <p>Seven steps in Microsoft Edge on Windows or Mac, about three minutes. The orange numbers in each picture match the steps.</p>
+            </div>
+          </div>
+
+          <ol class="steps">
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">1</span>
+                <h3>Download RJ Tasks for Teachers</h3>
+                <p>Save <code>{{ZIP}}</code> to your computer.</p>
+                <a class="btn self-start" href="downloads/{{ZIP}}" download>Download {{ZIP}}</a>
+              </div>
+              <figure class="ill drawn">{{ILL_DOWNLOAD}}<figcaption>when it finishes, click Show in folder.</figcaption></figure>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">2</span>
+                <h3>Unzip it, and keep the folder</h3>
+                <ul>
+                  <li><strong>Windows:</strong> right-click the file, choose <strong>Extract All…</strong>, then <strong>Extract</strong>.</li>
+                  <li><strong>Mac:</strong> double-click the file.</li>
+                </ul>
+                <p class="tip">Move the new <strong>{{FOLDER}}</strong> folder to <strong>Documents</strong>. Edge runs the extension from this folder, so if it gets deleted, the extension stops working.</p>
+              </div>
+              <figure class="ill drawn">{{ILL_EXTRACT}}<figcaption>File Explorer on Windows.</figcaption></figure>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">3</span>
+                <h3>Open Edge's extensions page</h3>
+                <p>In Microsoft Edge, click the address bar, type this address and press <span class="kbd">Enter</span>. Websites can't link straight to this page, so it has to be typed or pasted.</p>
+                <div class="copyrow">
+                  <input id="edge-url" type="text" value="edge://extensions" readonly aria-label="Edge extensions page address">
+                  <button class="btn secondary" id="copy-btn" type="button">Copy</button>
+                </div>
+                <p class="status" id="copy-status" role="status"></p>
+              </div>
+              <figure class="ill drawn">{{ILL_ADDRESS}}<figcaption>the Edge address bar.</figcaption></figure>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">4</span>
+                <h3>Turn on Developer mode</h3>
+                <p>On the left side of the Extensions page, near the bottom, switch on <strong>Developer mode</strong>. A row of new buttons appears at the top.</p>
+                <p class="tip">If the switch is grey and won't move, your computer is managed by RJ. Skip these steps: the extension will be installed for you.</p>
+              </div>
+              <figure class="ill drawn">{{ILL_DEVMODE}}<figcaption>the Extensions page with Developer mode on.</figcaption></figure>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">5</span>
+                <h3>Load the folder</h3>
+                <p>Click <strong>Load unpacked</strong>. Find the <strong>{{FOLDER}}</strong> folder from step 2 and click <strong>Select Folder</strong>.</p>
+                <p>Pick the folder itself, not the .zip file. Inside it is a file called <code>manifest.json</code>.</p>
+              </div>
+              <figure class="ill drawn">{{ILL_LOAD}}<figcaption>Load unpacked and the folder picker.</figcaption></figure>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">6</span>
+                <h3>Pin it to the toolbar</h3>
+                <p>RJ Tasks for Teachers now appears in your list of extensions with its switch on. To keep its icon next to the address bar, click the puzzle piece, then the eye next to RJ Tasks for Teachers. The icon shows how many assignments have work to grade.</p>
+              </div>
+              <figure class="ill drawn">{{ILL_PIN}}<figcaption>the Extensions menu in the Edge toolbar.</figcaption></figure>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <span class="num" aria-hidden="true">7</span>
+                <h3>Open Canvas</h3>
+                <p>Go to <a href="https://rjhs.instructure.com">rjhs.instructure.com</a>, or reload Canvas if it's already open. Click <strong>My Classes</strong> in the bottom-right corner. On a course page, the panel starts on that class.</p>
+              </div>
+              <figure class="ill"><img src="assets/my-classes-button.webp" width="900" height="562" alt="Canvas dashboard with the My Classes button in the bottom-right corner showing a red 4" loading="lazy"><figcaption>The My Classes button, with Canvas's count of assignments to grade.</figcaption></figure>
+            </li>
+          </ol>
+        </section>
+
+        <section id="privacy" aria-labelledby="privacy-title">
+          <h2 id="privacy-title">Privacy</h2>
+          <p class="lede">RJ Tasks for Teachers shows you information you can already see in Canvas, and nothing about your students leaves your computer. Read the full <a href="privacy.html">privacy policy</a>.</p>
+          <div class="privacy">
+            <div><b>Data collected</b>None. No analytics, tracking, accounts or ads.</div>
+            <div><b>Talks to</b>Only rjhs.instructure.com, using your own Canvas sign-in.</div>
+            <div><b>Reads</b>Your classes, assignments, submissions waiting to be graded, Missing flags and your students' names, for classes you teach.</div>
+            <div><b>Changes</b>Nothing. RJ Tasks for Teachers can't create, edit, grade or delete anything in Canvas.</div>
+            <div><b>Stores</b>Your settings and which check-up items you ignored. Never student names, work or grades.</div>
+            <div><b>Browser permission</b>"Storage", to remember your settings. Nothing else.</div>
+            <div><b>This website</b>Loads nothing from other sites: no fonts, trackers or scripts from anywhere else, and it collects nothing.</div>
+            <div><b>Bug and feature form</b>An RJ Microsoft Form. Only people signed in with an RJ account can open it.</div>
+          </div>
+        </section>
+
+        <section id="help" aria-labelledby="help-title">
+          <h2 id="help-title" class="mb16">Help</h2>
+          <div class="request mb16" id="ideas">
+            <h3>Report a bug or request a feature</h3>
+            <p>Found something that isn't working, or want RJ Tasks for Teachers to do something new? Use the RJ Tasks for Teachers form. It takes about a minute, and you'll sign in with your RJ account. For a bug, add a screenshot if you can. Please don't include student names or grades.</p>
+            <a class="btn self-start" href="{{FORM_URL}}" target="_blank" rel="noopener noreferrer">Report a bug or request a feature</a>
+          </div>
+          <details>
+            <summary>I don't see My Classes in Canvas</summary>
+            <p>The button only appears for people who teach or TA a current Canvas class. Make sure you're on rjhs.instructure.com and reload the page. In SpeedGrader and the Gradebook it stays hidden unless you turn it on in Settings. In Edge, open <code>edge://extensions</code> and check that RJ Tasks for Teachers is listed and switched on.</p>
+          </details>
+          <details>
+            <summary>A class I don't use (a sandbox, advisory) keeps showing up</summary>
+            <p>Click the RJ Tasks for Teachers icon, then <strong>Settings</strong>, and uncheck that class under <strong>Classes</strong>.</p>
+          </details>
+          <details>
+            <summary>Why does the button count differ from the To grade number?</summary>
+            <p>The button shows Canvas's own count of <em>assignments</em> with something to grade. To grade counts <em>submissions</em>, one per student, so it's usually bigger.</p>
+          </details>
+          <details>
+            <summary>Why doesn't Week show what students have in other classes?</summary>
+            <p>Canvas only lets teachers see the courses they teach. Week covers your own classes. It flags any day where one class or section has two or more graded items due.</p>
+          </details>
+          <details>
+            <summary>A check-up item is on purpose (a 0-point practice, say)</summary>
+            <p>Click <strong>Ignore</strong>. It's hidden on your computer only, and nothing changes in Canvas. "Show them again" at the bottom of Check-up brings ignored items back.</p>
+          </details>
+          <details>
+            <summary>Edge asks me to turn off "developer mode extensions"</summary>
+            <p>Edge shows this reminder for any extension installed by hand. Choose to keep it. When Ed Tech installs it for you, the reminder doesn't appear.</p>
+          </details>
+          <details>
+            <summary>The panel shows an error</summary>
+            <p>Click <strong>Refresh</strong> at the bottom of the panel, or reload Canvas. If it keeps happening, <a href="{{FORM_URL}}" target="_blank" rel="noopener noreferrer">report a bug</a> and add a screenshot of the message (hide student names first).</p>
+          </details>
+        </section>
+      </div>
+
+      <aside class="rail" aria-label="Details">
+        <div class="panel">
+          <h3>Details</h3>
+          <dl class="details">
+            <dt>Version</dt><dd>{{VERSION}}</dd>
+            <dt>Updated</dt><dd>{{UPDATED}}</dd>
+            <dt>Size</dt><dd>{{ZIPKB}} KB</dd>
+            <dt>Browser</dt><dd>Microsoft Edge</dd>
+            <dt>Works on</dt><dd>rjhs.instructure.com</dd>
+            <dt>Language</dt><dd>English</dd>
+            <dt>Made by</dt><dd>Regis Jesuit Ed Tech</dd>
+          </dl>
+          <p class="rail-text">SHA-256 of the download, for IT to check:</p>
+          <p class="hash">{{SHA256}}</p>
+        </div>
+        <div class="panel">
+          <h3>Bugs and feature requests</h3>
+          <p class="rail-text"><a href="{{FORM_URL}}" target="_blank" rel="noopener noreferrer">Use the RJ Tasks for Teachers form</a> (RJ sign-in). For a bug, a screenshot helps.</p>
+        </div>
+        <div class="panel">
+          <h3>For students</h3>
+          <p class="rail-text"><a href="https://rjedtech.github.io/rj-tasks-site/">RJ Tasks for Students</a> shows each student what's due, what's missing and what to work on first.</p>
+        </div>
+        <div class="panel">
+          <h3>Credits</h3>
+          <p class="rail-text">Made by Regis Jesuit Ed Tech. Open source (MIT license). Not affiliated with Instructure.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">RJ Tasks for Teachers · Regis Jesuit High School Ed Tech · <a href="privacy.html">Privacy policy</a></div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

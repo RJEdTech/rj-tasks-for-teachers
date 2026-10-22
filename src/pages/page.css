@@ -1,0 +1,27 @@
+:root { --bg:#ffffff; --fg:#1f2329; --muted:#5b6168; --line:#d8dbe0; --card:#f6f7f9; --red:#C11430; --link:#0b5cad; }
+@media (prefers-color-scheme: dark) { :root { --bg:#15161a; --fg:#e8e9ec; --muted:#a9adb4; --line:#33363d; --card:#1d1f24; --link:#8ab8ff; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; }
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.mast { background: #2a2a2a; color: #fff; border-bottom: 6px solid var(--red); padding: 14px 20px 12px; display: flex; gap: 12px; align-items: center; }
+.mark { width: 34px; height: 34px; border-radius: 6px; background: var(--red); color: #fff; font-weight: 800; font-size: 15px; display: grid; place-items: center; flex: none; }
+.mast h1 { margin: 0; font-size: 18px; line-height: 1.2; }
+.mast p { margin: 2px 0 0; color: #b8b8b8; font-size: 13px; text-transform: uppercase; letter-spacing: .12em; }
+main { padding: 16px 20px 24px; max-width: 640px; }
+a { color: var(--link); }
+.help { color: var(--muted); font-size: 14px; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px 14px; margin: 0 0 16px; background: var(--card); }
+legend { font-weight: 700; padding: 0 6px; }
+label { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
+input { width: 18px; height: 18px; margin: 2px 0 0; flex: none; accent-color: #2a2a2a; }
+.saved { color: #166534; font-size: 14px; min-height: 21px; }
+@media (prefers-color-scheme: dark) { .saved { color: #86efac; } input { accent-color: #e8e9ec; } }
+/* popup */
+body.popup { width: 320px; }
+.popup main { padding: 14px 16px 16px; }
+.btn { display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); font: inherit; cursor: pointer; text-decoration: none; }
+.btn.primary { background: #2a2a2a; color: #fff; border-color: #2a2a2a; }
+@media (prefers-color-scheme: dark) { .btn.primary { background: #e8e9ec; color: #15161a; border-color: #e8e9ec; } }
+.foot { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+.block { display: block; }
+[hidden] { display: none !important; }

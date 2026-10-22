@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "RJ Tasks for Teachers",
+  "short_name": "RJ Teachers",
+  "description": "Grading, course check-ups and missing-work follow-up for Regis Jesuit teachers, inside Canvas.",
+  "version": "0.0.0",
+  "permissions": ["storage"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "RJ Tasks for Teachers",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" }
+  },
+  "options_page": "options.html",
+  "icons": { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" },
+  "content_scripts": [
+    {
+      "matches": ["https://rjhs.instructure.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+  },
+  "minimum_chrome_version": "111"
+}

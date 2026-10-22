@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RJ Tasks for Teachers settings</title>
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<header class="mast"><div class="mark" aria-hidden="true">RJ</div><div><h1>RJ Tasks for Teachers</h1><p>Settings</p></div></header>
+<main>
+<p class="help">Changes save automatically. Open Canvas tabs update on their own.</p>
+<p class="saved" id="saved" role="status" aria-live="polite"></p>
+
+<fieldset>
+<legend>Students to check on</legend>
+<p class="help">List students with at least this many missing assignments this grading period.</p>
+<div id="threshold"></div>
+<label><input type="checkbox" id="hideNames"> <span>Hide student names until I click “Show names”<span class="help block">Recommended if you ever project or share your screen. Names hide again each time the panel closes.</span></span></label>
+</fieldset>
+
+<fieldset>
+<legend>Classes</legend>
+<p class="help" id="classes-help">Uncheck a class to leave it out (a sandbox or advisory course, for example).</p>
+<div id="classes"></div>
+</fieldset>
+
+<fieldset>
+<legend>The My Classes button</legend>
+<label><input type="checkbox" id="buttonOnGradingPages"> <span>Also show it in SpeedGrader and the Gradebook<span class="help block">Off by default so it doesn’t cover grading controls.</span></span></label>
+</fieldset>
+
+<fieldset id="feedback-box" hidden>
+<legend>Report a bug or request a feature</legend>
+<p>Something not working, or an idea for RJ Tasks for Teachers? <a id="feedback" href="#" target="_blank" rel="noopener noreferrer">Use the feedback form</a> (RJ sign-in required). A screenshot helps with bugs.</p>
+</fieldset>
+
+<p class="help">RJ Tasks for Teachers reads your classes from Canvas in your browser and never changes anything there. Nothing is sent anywhere else. <a id="homepage" href="#" target="_blank" rel="noopener noreferrer">Privacy and help</a></p>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

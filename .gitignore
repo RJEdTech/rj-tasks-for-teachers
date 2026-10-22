@@ -1,0 +1,5 @@
+node_modules/
+build/
+e2e-shots/
+tools/mock-canvas/*.pem
+build-e2e/
