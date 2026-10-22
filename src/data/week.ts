@@ -6,7 +6,7 @@
   Teachers can only see the courses they teach, so this can't show what
   students have due in other classes.
 */
-import { CanvasAssignment, TeacherCourse } from '../lib/types';
+import { AssignmentDate, CanvasAssignment, TeacherCourse } from '../lib/types';
 import { addDays, dayKey, parse, startOfDay } from '../lib/dates';
 import { datesOf, isGraded } from './assignments';
 
@@ -17,7 +17,10 @@ export interface WeekItem {
   dueAt: Date;
   points: number | null;
   graded: boolean;
-  forWhom: string | null; // section name when the date is a section override
+  /* who this date is for: null = the whole class; otherwise a section name,
+     or e.g. "1 student" for an individual extension */
+  forWhom: string | null;
+  scope: 'all' | 'section' | 'some';
 }
 
 export interface WeekFlag {
@@ -54,7 +57,7 @@ export function buildWeek(
         if (!due) continue;
         const day = index.get(dayKey(due));
         if (!day) continue;
-        const forWhom = d.set_type === 'CourseSection' && d.title ? d.title : null;
+        const { scope, forWhom } = whoFor(d);
         const k = `${day.key}:${forWhom ?? ''}`;
         if (seenHere.has(k)) continue;
         seenHere.add(k);
@@ -66,6 +69,7 @@ export function buildWeek(
           points: a.points_possible,
           graded: isGraded(a) && (a.points_possible ?? 0) > 0,
           forWhom,
+          scope,
         });
       }
     }
@@ -78,15 +82,43 @@ export function buildWeek(
         x.course.code.localeCompare(y.course.code, 'en', { numeric: true }) ||
         x.name.localeCompare(y.name)
     );
-    const groups = new Map<string, WeekFlag>();
-    for (const it of day.items) {
-      if (!it.graded) continue;
-      const k = `${it.course.id}:${it.forWhom ?? ''}`;
-      const g = groups.get(k) ?? { course: it.course, forWhom: it.forWhom, count: 0 };
-      g.count++;
-      groups.set(k, g);
-    }
-    day.flags = [...groups.values()].filter((g) => g.count >= 2);
+    day.flags = flagsFor(day.items);
   }
   return out;
+}
+
+const STUDENTS_TITLE = /^\d+ students?$/i;
+
+/* Classify one due date: the whole class, one section, or a few students
+   (an individual extension or a group). */
+export function whoFor(d: AssignmentDate): { scope: WeekItem['scope']; forWhom: string | null } {
+  if (d.base) return { scope: 'all', forWhom: null };
+  const title = (d.title || '').trim();
+  if (d.set_type === 'ADHOC' || d.set_type === 'Group' || STUDENTS_TITLE.test(title))
+    return { scope: 'some', forWhom: title || 'some students' };
+  if (d.set_type === 'CourseSection' || title) return { scope: 'section', forWhom: title || null };
+  return { scope: 'all', forWhom: null };
+}
+
+/* A day is flagged when one class has 2+ graded items due for everyone, or
+   when a section's own dates plus the whole-class dates reach 2. Dates for a
+   few students (extensions) never count. */
+export function flagsFor(items: WeekItem[]): WeekFlag[] {
+  const flags: WeekFlag[] = [];
+  const byCourse = new Map<string, WeekItem[]>();
+  for (const it of items) {
+    if (!it.graded || it.scope === 'some') continue;
+    const list = byCourse.get(it.course.id) ?? [];
+    list.push(it);
+    byCourse.set(it.course.id, list);
+  }
+  for (const list of byCourse.values()) {
+    const course = list[0].course;
+    const everyone = list.filter((i) => i.scope === 'all').length;
+    if (everyone >= 2) flags.push({ course, forWhom: null, count: everyone });
+    const sections = new Map<string, number>();
+    for (const i of list) if (i.scope === 'section' && i.forWhom) sections.set(i.forWhom, (sections.get(i.forWhom) ?? 0) + 1);
+    for (const [name, n] of sections) if (everyone + n >= 2) flags.push({ course, forWhom: name, count: everyone + n });
+  }
+  return flags;
 }

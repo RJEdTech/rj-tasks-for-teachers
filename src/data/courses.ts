@@ -3,11 +3,13 @@ import { parse } from '../lib/dates';
 
 const TEACHING = new Set(['teacher', 'ta']);
 
-/* A course this person teaches (or TAs) that hasn't ended. */
+/* A published course this person teaches (or TAs) that hasn't ended. */
 export function isCurrentTeachingCourse(c: CanvasCourse, now: Date): boolean {
   if (!c.enrollments?.some((e) => TEACHING.has(e.type))) return false;
-  if (c.workflow_state === 'deleted' || c.workflow_state === 'completed') return false;
-  const end = parse(c.end_at) ?? parse(c.term?.end_at ?? null);
+  if (c.workflow_state !== undefined && c.workflow_state !== 'available') return false;
+  // A course's own end date only counts when Canvas enforces it; otherwise the term's does.
+  const end =
+    (c.restrict_enrollments_to_course_dates ? parse(c.end_at) : null) ?? parse(c.term?.end_at ?? null);
   if (end && end.getTime() < now.getTime()) return false;
   return true;
 }

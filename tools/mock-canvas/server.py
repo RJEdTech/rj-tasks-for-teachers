@@ -54,6 +54,11 @@ def assignments_for(cid):
             A(1009, "Unit 3 Test", day(2), published=False, points=100, group="g2"),  # unpublished, due soon
             A(1010, "HW 3.2", day(5, 0, 0)),  # 12:00 AM
             A(1011, "Warm-up log", day(3), points=0),  # 0 points
+            # due next week for the class, but one student has an extension to tomorrow
+            A(1012, "Essay draft", day(6), all_dates=[
+                {"base": True, "due_at": day(6)},
+                {"title": "1 student", "set_type": "ADHOC", "set_id": None, "due_at": day(1)},
+            ]),
         ]
     if cid == "102":  # GEOMETRY, unweighted, section dates
         return [
@@ -92,36 +97,39 @@ def users_for(cid):
 
 
 def submissions_for(cid, state, aids):
+    """Canvas-like: filter by workflow_state when given, otherwise return every state."""
     users = users_for(cid)
-    out = []
+    dropped = {"id": "9999", "name": "Dropped Student"}  # not an active enrollment
     S = lambda u, aid, st, **kw: {"id": f"{aid}-{u['id']}", "assignment_id": str(aid), "user_id": u["id"],
                                   "workflow_state": st, "submitted_at": kw.get("at"), "late": kw.get("late", False),
                                   "missing": kw.get("missing", False), "excused": kw.get("excused", False),
-                                  "grade": kw.get("grade"), "grade_matches_current_submission": kw.get("gm", True)}
+                                  "grade": kw.get("grade"), "grade_matches_current_submission": kw.get("gm", True),
+                                  "cached_due_date": kw.get("due")}
+    out = []
     if cid == "101":
-        if state == "submitted":
-            for i, u in enumerate(users[:6]):
-                out.append(S(u, 1001, "submitted", at=day(-12, 14 + i % 3, 5), late=i == 5))
-            for u in users[:3]:
-                out.append(S(u, 1004, "submitted", at=day(-2, 20, 30)))
-            out.append(S(users[4], 1002, "submitted", at=day(-1, 9, 0), late=True, grade="8", gm=False))
-        if state == "pending_review":
-            out.append(S(users[7], 1001, "pending_review", at=day(-12, 15, 0)))
-        if state == "unsubmitted":
-            # Casey (2) misses 3; Harper (7) misses 2; the evil-name test student (8) misses 4; Jordan excused
-            plan = {2: [1002, 1003, 1004], 7: [1003, 1004], 8: [1001, 1002, 1003, 1004]}
-            for idx, alist in plan.items():
-                for aid in alist:
-                    out.append(S(users[idx], aid, "unsubmitted", missing=True))
-            out.append(S(users[9], 1003, "unsubmitted", missing=True, excused=True))
-            out.append(S(users[1], 1004, "unsubmitted", missing=False))
+        for i, u in enumerate(users[:6]):
+            out.append(S(u, 1001, "submitted", at=day(-12, 14 + i % 3, 5), late=i == 5))
+        for u in users[:3]:
+            out.append(S(u, 1004, "submitted", at=day(-2, 20, 30)))
+        out.append(S(dropped, 1004, "submitted", at=day(-3, 9, 0)))  # must not be counted
+        out.append(S(users[4], 1002, "submitted", at=day(-1, 9, 0), late=True, grade="8", gm=False))
+        out.append(S(users[7], 1001, "pending_review", at=day(-12, 15, 0)))
+        # Casey (2) misses 3; Harper (7) misses 2 unsubmitted + 1 auto-graded by the missing policy;
+        # the evil-name test student (8) misses 4; Jordan's is excused
+        plan = {2: [1002, 1003, 1004], 7: [1003, 1004], 8: [1001, 1002, 1003, 1004]}
+        for idx, alist in plan.items():
+            for aid in alist:
+                out.append(S(users[idx], aid, "unsubmitted", missing=True))
+        out.append(S(users[7], 1002, "graded", missing=True, grade="0"))
+        out.append(S(users[9], 1003, "unsubmitted", missing=True, excused=True))
+        out.append(S(users[1], 1004, "unsubmitted", missing=False))
+        out.append(S(dropped, 1003, "unsubmitted", missing=True))
     if cid == "102":
-        if state == "submitted":
-            for u in users[:4]:
-                out.append(S(u, 2001, "submitted", at=day(-4, 21, 0)))
-        if state == "unsubmitted":
-            for aid in [2001]:
-                out.append(S(users[3], aid, "unsubmitted", missing=True))
+        for u in users[:4]:
+            out.append(S(u, 2001, "submitted", at=day(-4, 21, 0)))
+        out.append(S(users[3], 2001, "unsubmitted", missing=True))
+    if state:
+        out = [s for s in out if s["workflow_state"] == state]
     if aids:
         out = [s for s in out if s["assignment_id"] in aids]
     return out
@@ -140,6 +148,7 @@ def courses(as_student):
         t("102", "GEOMETRY", "Geometry"),
         t("103", "ADVISEMENT", "Advisement"),
         t("199", "ALGEBRA 1 (2025)", "Algebra 1 last year", term_end="2026-05-29T06:00:00Z"),
+        dict(t("150", "SANDBOX", "Unpublished sandbox"), workflow_state="unpublished"),
         t("201", "FACULTY PD", "Faculty PD", role="student"),
     ]
 

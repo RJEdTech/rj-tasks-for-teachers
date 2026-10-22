@@ -126,6 +126,7 @@ export function studentsView(opts: {
   rows: StudentRow[];
   courses: TeacherCourse[];
   threshold: number;
+  periodKnown: boolean;
   namesShown: boolean;
   showCourse: boolean;
   onShowNames: () => void;
@@ -139,7 +140,9 @@ export function studentsView(opts: {
   const sel = h('select', { 'aria-label': 'Minimum missing assignments' }) as HTMLSelectElement;
   for (const n of [1, 2, 3, 4, 5]) sel.append(h('option', { value: n, selected: n === threshold }, String(n)));
   sel.addEventListener('change', () => opts.onThreshold(Number(sel.value)));
-  box.append(h('p', { class: 'summary' }, 'Students with at least ', sel, ' missing this grading period.'));
+  box.append(
+    h('p', { class: 'summary' }, 'Students with at least ', sel, opts.periodKnown ? ' missing this grading period.' : ' missing so far this course.')
+  );
 
   if (!rows.length) {
     box.append(h('p', { class: 'empty' }, 'No students at that level. Nice.'));

@@ -30,7 +30,10 @@ export interface Issue {
   sortDate: number;
 }
 
-const WEIGHT_TOLERANCE = 0.01;
+const WEIGHT_TOLERANCE = 0.05; // three groups at 33.33% must not trip it
+
+/* Canvas's attendance tool (Roll Call) creates an undated assignment in every course. */
+const ATTENDANCE = /^roll call attendance$/i;
 
 function issueKey(courseId: string, rule: Rule, id: string): string {
   return `${courseId}:${rule}:${id}`;
@@ -70,7 +73,7 @@ export function runCheckup(
     const due = dueDates(a);
     const graded = isGraded(a);
 
-    if (a.published && graded && due.length === 0) {
+    if (a.published && graded && due.length === 0 && !ATTENDANCE.test(a.name.trim())) {
       add('no_due_date', 'fix', a, "No due date, so it won't appear in students' To Do list, calendar or RJ Tasks.");
     }
 
@@ -96,7 +99,7 @@ export function runCheckup(
       const dueAt = parse(d.due_at);
       const lockAt = parse(d.lock_at ?? null);
       if (dueAt && lockAt && lockAt.getTime() < dueAt.getTime() && a.published) {
-        const who = d.base === false && d.title ? ` for ${d.title}` : '';
+        const who = !d.base && d.title ? ` for ${d.title}` : '';
         add(
           'locks_before_due',
           'fix',
@@ -144,9 +147,10 @@ export function runCheckup(
         rule: 'weights_total',
         severity: 'fix',
         title: 'Assignment group weights',
-        detail: `The weights add up to ${round(total)}%, not 100%. Canvas rescales them, so each group counts for ${
-          total < 100 ? 'more' : 'less'
-        } than its weight says.`,
+        detail:
+          total < 100
+            ? `The weights add up to ${round(total)}%, not 100%. Canvas scales them up, so each group counts for more than its weight says.`
+            : `The weights add up to ${round(total)}%, more than 100%. Canvas doesn't scale them down, so class grades can come out higher than they should.`,
         link: { kind: 'assignments_index' },
         sortDate: 0,
       });
@@ -190,5 +194,5 @@ function weekday(d: Date): string {
 }
 
 function round(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, '');
 }

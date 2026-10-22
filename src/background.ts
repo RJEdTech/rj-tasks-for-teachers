@@ -21,8 +21,10 @@ chrome.runtime.onMessage.addListener((msg: unknown, sender) => {
   const m = msg as { type?: unknown; count?: unknown };
   if (m.type === 'badge') {
     const n = typeof m.count === 'number' && Number.isFinite(m.count) ? Math.max(0, Math.floor(m.count)) : 0;
-    void chrome.action.setBadgeBackgroundColor({ color: '#C11430' });
-    void chrome.action.setBadgeText({ text: n ? (n > 99 ? '99+' : String(n)) : '' });
+    const tabId = sender.tab?.id;
+    if (tabId === undefined) return;
+    void chrome.action.setBadgeBackgroundColor({ tabId, color: '#C11430' });
+    void chrome.action.setBadgeText({ tabId, text: n ? (n > 99 ? '99+' : String(n)) : '' });
   } else if (m.type === 'open-settings') {
     void chrome.runtime.openOptionsPage();
   }

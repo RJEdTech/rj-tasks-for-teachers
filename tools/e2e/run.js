@@ -151,12 +151,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await tab('students');
   t = await waitBody(/missing this grading period/);
   check('Students: names hidden by default', !/Casey|Avery|Harper|img/.test(t) && /Names are hidden/.test(t), t.slice(0, 120));
-  check('Students: per-class count while hidden', /ALGEBRA 1\s*2 students/.test(t));
+  check('Students: per-class count while hidden', /ALGEBRA 1\s*3 students/.test(t), t.slice(0, 200));
   await page.screenshot({ path: path.join(OUT, '3-students-hidden.png') });
   await $('.privacy button').click();
   t = await waitBody(/Hide names/);
   const names = await $('.body details summary .plain').allTextContents();
-  check('Students: most missing first, excused work not counted', names.length === 2 && /Test$/.test(names[0]) && names[1] === 'Casey Ellis', names.join(' | '));
+  check(
+    'Students: most missing first; auto-graded missing work counts; excused and dropped do not',
+    names.length === 3 && /Test$/.test(names[0]) && names[1] === 'Casey Ellis' && names[2] === 'Harper Jones' && !/Dropped/.test(t),
+    names.join(' | ')
+  );
   const imgs = await page.evaluate(() => document.querySelector('div[data-rjtt]').shadowRoot.querySelectorAll('img').length);
   check('Students: a name containing HTML shows as text, not an image', imgs === 0 && /<img src=x/.test(t));
   const gradesHref = await $('.body details a').nth(1).getAttribute('href');
@@ -165,10 +169,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await $('.body .actions button:has-text("Copy list")').click();
   await sleep(200);
   const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
-  check('Students: Copy list gives plain text', /^ALGEBRA 1\n.*Casey Ellis \(3 missing\): HW 2.4 Factoring; HW 2.5 Quadratics; HW 2.6 Review/s.test(clip), clip.slice(0, 80));
-  await $('.body select').selectOption('2');
-  t = await waitBody(/Harper/);
-  check('Students: threshold change adds students', /Harper Jones/.test(t));
+  check('Students: Copy list gives plain text', /^ALGEBRA 1 · Algebra 1\n.*Casey Ellis \(3 missing\): HW 2.4 Factoring; HW 2.5 Quadratics; HW 2.6 Review/s.test(clip), clip.slice(0, 80));
+  await $('.body select').selectOption('4');
+  for (let i = 0; i < 30 && (await $('.body details').count()) !== 1; i++) await sleep(100);
+  check('Students: threshold change narrows the list', (await $('.body details').count()) === 1 && !/Harper/.test(await bodyText()));
   await $('.body select').selectOption('3');
   await waitBody(/missing this grading period/);
 
@@ -194,6 +198,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     flags.join(' | ')
   );
   check('Week: unpublished and ungraded items do not add to flags', !/Unit 3 Test/.test(t));
+  check('Week: a one-student extension is labeled and not counted', /Essay draft\s*1 student/.test(t) && !/ALGEBRA 1: 3 graded/.test(t));
   check('Week: says it only covers your classes', /Canvas doesn't let teachers see/.test(t));
   await page.screenshot({ path: path.join(OUT, '4-week.png') });
 

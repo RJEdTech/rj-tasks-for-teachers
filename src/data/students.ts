@@ -80,7 +80,11 @@ export function buildStudents(
       row = { course, userId: uid, name: u.name, sortableName: u.sortable_name || u.name, missing: [] };
       rows.set(uid, row);
     }
-    row.missing.push({ assignmentId: String(a.id), name: a.name, dueAt: parse(a.due_at) });
+    row.missing.push({
+      assignmentId: String(a.id),
+      name: a.name,
+      dueAt: parse(s.cached_due_date ?? null) ?? parse(a.due_at),
+    });
   }
   return [...rows.values()]
     .filter((r) => r.missing.length >= threshold)
@@ -96,10 +100,10 @@ export function studentsAsText(rows: StudentRow[]): string {
   const lines: string[] = [];
   let course = '';
   for (const r of rows) {
-    if (r.course.code !== course) {
+    if (r.course.id !== course) {
       if (lines.length) lines.push('');
-      course = r.course.code;
-      lines.push(course);
+      course = r.course.id;
+      lines.push(r.course.code === r.course.name ? r.course.name : `${r.course.code} · ${r.course.name}`);
     }
     lines.push(`${r.name} (${r.missing.length} missing): ${r.missing.map((m) => m.name).join('; ')}`);
   }

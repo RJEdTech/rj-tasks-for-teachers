@@ -70,7 +70,7 @@ describe('views', () => {
     { course: C, userId: '900', name: 'Avery Cole', sortableName: 'Cole, Avery', missing: [{ assignmentId: '1', name: 'HW 1', dueAt: NOW }, { assignmentId: '2', name: 'HW 2', dueAt: null }, { assignmentId: '3', name: 'HW 3', dueAt: null }] },
   ];
   const base = {
-    rows, courses: [C], threshold: 3, showCourse: true,
+    rows, courses: [C], threshold: 3, periodKnown: true, showCourse: true,
     onShowNames: () => undefined, onHideNames: () => undefined, onCopy: () => undefined, onThreshold: () => undefined,
   };
 
@@ -80,6 +80,8 @@ describe('views', () => {
     expect(hidden.textContent).toContain('ALGEBRA 1');
     expect(hidden.textContent).toContain('1 student');
     expect(hidden.textContent).toContain('Names are hidden');
+    expect(hidden.textContent).toContain('missing this grading period');
+    expect(studentsView({ ...base, namesShown: false, periodKnown: false }).textContent).toContain('missing so far this course');
   });
 
   it('Students shows names, missing work and a grades link when asked', () => {

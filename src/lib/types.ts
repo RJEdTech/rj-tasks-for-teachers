@@ -17,8 +17,9 @@ export interface CanvasCourse {
   id: string;
   name: string;
   course_code?: string;
-  workflow_state?: string; // 'available' when published
+  workflow_state?: string; // 'available' when published, 'unpublished', 'completed'
   end_at?: string | null;
+  restrict_enrollments_to_course_dates?: boolean;
   term?: CanvasTerm | null;
   enrollments?: CanvasEnrollment[];
   apply_assignment_group_weights?: boolean;
@@ -71,6 +72,7 @@ export interface CanvasSubmission {
   excused?: boolean | null;
   grade?: string | null;
   grade_matches_current_submission?: boolean | null;
+  cached_due_date?: string | null; // this student's own due date (overrides applied)
 }
 
 export interface CanvasGradingPeriod {

@@ -74,11 +74,15 @@ export class Panel {
     this.launcher.addEventListener('click', () => this.toggle());
     this.wrap.appendChild(this.launcher);
 
+    // Escape closes the panel when focus is in it (or nowhere in particular),
+    // and is left alone for Canvas's own dialogs.
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.panel && !this.panel.hidden) {
-        e.stopPropagation();
-        this.close();
-      }
+      if (e.key !== 'Escape' || !this.isOpen()) return;
+      const inPanel = e.composedPath().includes(this.host);
+      const idle = document.activeElement === document.body || document.activeElement === null;
+      if (!inPanel && !idle) return;
+      e.stopPropagation();
+      this.close();
     }, true);
   }
 
@@ -106,12 +110,13 @@ export class Panel {
   }
 
   updateSettings(s: Settings): void {
+    const prev = this.opts.settings;
     this.opts.settings = s;
     if (!s.hideNames) this.namesShown = true;
-    if (this.panel && !this.panel.hidden) {
-      this.loader.reset();
-      void this.openPanel();
-    }
+    if (!this.isOpen()) return;
+    const classesChanged = prev.excludedCourses.join(',') !== s.excludedCourses.join(',');
+    if (classesChanged) void this.loadCourses(); // course list is filtered, data stays cached
+    else if (prev.missingThreshold !== s.missingThreshold || prev.hideNames !== s.hideNames) void this.renderTab();
   }
 
   isOpen(): boolean {
@@ -285,6 +290,7 @@ export class Panel {
           rows: r.value,
           courses,
           threshold: this.opts.settings.missingThreshold,
+          periodKnown: r.periodKnown,
           namesShown: this.namesShown,
           showCourse,
           onShowNames: () => {

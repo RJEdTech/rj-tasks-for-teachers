@@ -1,6 +1,6 @@
 {
   "name": "rj-tasks-for-teachers",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Grading, course check-ups and missing-work follow-up for Regis Jesuit teachers, inside Canvas.",
   "license": "MIT",

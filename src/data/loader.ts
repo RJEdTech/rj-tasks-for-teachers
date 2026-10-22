@@ -20,6 +20,7 @@ import { buildStudents, chunk, currentPeriod, pastDueIds, StudentRow } from './s
 import { buildWeek, WeekDay } from './week';
 
 const PARALLEL = 3;
+const IDS_PER_REQUEST = 20;
 
 export interface Loaded<T> {
   value: T;
@@ -27,6 +28,15 @@ export interface Loaded<T> {
   failed: TeacherCourse[];
   /* true when a list was cut short at the page limit */
   partial: boolean;
+}
+
+interface CourseMissing {
+  course: TeacherCourse;
+  users: CanvasUser[];
+  assignments: CanvasAssignment[];
+  submissions: CanvasSubmission[];
+  partial: boolean;
+  periodKnown: boolean;
 }
 
 export class Loader {
@@ -76,16 +86,35 @@ export class Loader {
     });
   }
 
-  private async toGradeSubmissions(cid: string): Promise<{ subs: CanvasSubmission[]; partial: boolean }> {
+  /* Active students only: the Test Student, dropped and concluded students are left out. */
+  private users(cid: string): Promise<CanvasUser[]> {
     const id = assertId(cid);
-    const lists = await Promise.all(
-      ['submitted', 'pending_review'].map((state) =>
-        canvasGetAll<CanvasSubmission>(
-          `/api/v1/courses/${id}/students/submissions?student_ids[]=all&workflow_state=${state}&per_page=100`
+    return this.once(`u:${id}`, async () => {
+      const { items } = await canvasGetAll<CanvasUser>(
+        `/api/v1/courses/${id}/users?enrollment_type[]=student&enrollment_state[]=active&per_page=100`
+      );
+      return items;
+    });
+  }
+
+  private activeOnly(subs: CanvasSubmission[], users: CanvasUser[] | null): CanvasSubmission[] {
+    if (!users) return subs;
+    const ids = new Set(users.map((u) => String(u.id)));
+    return subs.filter((s) => ids.has(String(s.user_id)));
+  }
+
+  private toGradeSubmissions(cid: string): Promise<{ subs: CanvasSubmission[]; partial: boolean }> {
+    const id = assertId(cid);
+    return this.once(`s:${id}`, async () => {
+      const lists = await Promise.all(
+        ['submitted', 'pending_review'].map((state) =>
+          canvasGetAll<CanvasSubmission>(
+            `/api/v1/courses/${id}/students/submissions?student_ids[]=all&enrollment_state=active&workflow_state=${state}&per_page=100`
+          )
         )
-      )
-    );
-    return { subs: lists.flatMap((l) => l.items), partial: lists.some((l) => l.truncated) };
+      );
+      return { subs: lists.flatMap((l) => l.items), partial: lists.some((l) => l.truncated) };
+    });
   }
 
   async toGrade(courses: TeacherCourse[]): Promise<Loaded<GradingRow[]>> {
@@ -100,9 +129,12 @@ export class Loader {
         return [];
       }
       try {
-        const r = await this.toGradeSubmissions(c.id);
+        const [r, users] = await Promise.all([
+          this.toGradeSubmissions(c.id),
+          this.users(c.id).catch(() => null),
+        ]);
         partial ||= r.partial;
-        return buildQueue(c, assignments, r.subs);
+        return buildQueue(c, assignments, this.activeOnly(r.subs, users));
       } catch {
         return queueFromCounts(c, assignments);
       }
@@ -139,44 +171,51 @@ export class Loader {
     }
   }
 
-  private users(cid: string): Promise<CanvasUser[]> {
-    const id = assertId(cid);
-    return this.once(`u:${id}`, async () => {
-      const { items } = await canvasGetAll<CanvasUser>(
-        `/api/v1/courses/${id}/users?enrollment_type[]=student&enrollment_state[]=active&per_page=100`
-      );
-      return items;
+  /* Every submission Canvas flags Missing, whatever its state: Canvas's
+     missing-submission policy grades missing work (state "graded") but keeps
+     the Missing flag, and so does a teacher's own "Missing" mark with a 0. */
+  private missing(c: TeacherCourse): Promise<CourseMissing> {
+    const id = assertId(c.id);
+    return this.once(`m:${id}`, async () => {
+      const [assignments, period, users] = await Promise.all([
+        this.assignments(id),
+        this.period(id),
+        this.users(id),
+      ]);
+      const ids = pastDueIds(assignments, period, this.now());
+      const submissions: CanvasSubmission[] = [];
+      let partial = false;
+      for (const part of chunk(ids, IDS_PER_REQUEST)) {
+        const q = part.map((a) => `assignment_ids[]=${assertId(a)}`).join('&');
+        const r = await canvasGetAll<CanvasSubmission>(
+          `/api/v1/courses/${id}/students/submissions?student_ids[]=all&enrollment_state=active&${q}&per_page=100`
+        );
+        partial ||= r.truncated;
+        submissions.push(...r.items.filter((s) => s.missing && !s.excused));
+      }
+      return { course: c, users, assignments, submissions, partial, periodKnown: !!period };
     });
   }
 
-  async students(courses: TeacherCourse[], threshold: number): Promise<Loaded<StudentRow[]>> {
+  async students(
+    courses: TeacherCourse[],
+    threshold: number
+  ): Promise<Loaded<StudentRow[]> & { periodKnown: boolean }> {
     const failed: TeacherCourse[] = [];
     let partial = false;
-    const now = this.now();
+    let periodKnown = true;
     const rows = await mapLimit(courses, PARALLEL, async (c) => {
       try {
-        const [assignments, period, users] = await Promise.all([
-          this.assignments(c.id),
-          this.period(c.id),
-          this.users(c.id),
-        ]);
-        const ids = pastDueIds(assignments, period, now);
-        const subs: CanvasSubmission[] = [];
-        for (const part of chunk(ids, 40)) {
-          const q = part.map((a) => `assignment_ids[]=${assertId(a)}`).join('&');
-          const r = await canvasGetAll<CanvasSubmission>(
-            `/api/v1/courses/${assertId(c.id)}/students/submissions?student_ids[]=all&workflow_state=unsubmitted&${q}&per_page=100`
-          );
-          partial ||= r.truncated;
-          subs.push(...r.items);
-        }
-        return buildStudents(c, users, subs, assignments, threshold);
+        const m = await this.missing(c);
+        partial ||= m.partial;
+        periodKnown &&= m.periodKnown;
+        return buildStudents(c, m.users, m.submissions, m.assignments, threshold);
       } catch {
         failed.push(c);
         return [];
       }
     });
-    return { value: rows.flat(), failed, partial };
+    return { value: rows.flat(), failed, partial, periodKnown };
   }
 
   async week(courses: TeacherCourse[]): Promise<Loaded<WeekDay[]>> {
