@@ -20,12 +20,15 @@
 
 <fieldset>
 <legend>Classes</legend>
-<p class="help" id="classes-help">Uncheck a class to leave it out (a sandbox or advisory course, for example).</p>
+<label><input type="checkbox" id="semesterOnly"> <span>Only this semester’s classes (recommended)<span class="help block">Your academic classes in the current 1st or 2nd Semester term. PD courses, RaiderQuest, clubs, templates and sandboxes are left out. Uncheck to include every published Canvas course you teach.</span></span></label>
+<p class="help" id="classes-help">Uncheck a class to leave it out too.</p>
 <div id="classes"></div>
 </fieldset>
 
 <fieldset>
-<legend>The My Classes button</legend>
+<legend>Where it shows up</legend>
+<p class="help">A My Classes card sits in Canvas’s right sidebar on your Dashboard (all your classes) and on each class’s home page (that class). Click any part of it for the full view.</p>
+<label><input type="checkbox" id="buttonElsewhere"> <span>Show the floating My Classes button on other Canvas pages<span class="help block">The bottom-right button also appears whenever your window is too narrow for Canvas to show its sidebar.</span></span></label>
 <label><input type="checkbox" id="buttonOnGradingPages"> <span>Also show it in SpeedGrader and the Gradebook<span class="help block">Off by default so it doesn’t cover grading controls.</span></span></label>
 </fieldset>
 

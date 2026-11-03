@@ -57,13 +57,17 @@ export class Loader {
     return p;
   }
 
-  courses(excluded: string[] = []): Promise<TeacherCourse[]> {
+  private rawCourses(): Promise<CanvasCourse[]> {
     return this.once('courses', async () => {
       const { items } = await canvasGetAll<CanvasCourse>(
         '/api/v1/courses?enrollment_state=active&include[]=term&per_page=100'
       );
       return items;
-    }).then((all) => teacherCourses(all, this.now(), excluded));
+    });
+  }
+
+  courses(excluded: string[] = [], allClasses = false): Promise<TeacherCourse[]> {
+    return this.rawCourses().then((all) => teacherCourses(all, this.now(), excluded, allClasses));
   }
 
   assignments(cid: string): Promise<CanvasAssignment[]> {
@@ -218,6 +222,13 @@ export class Loader {
     return { value: rows.flat(), failed, partial, periodKnown };
   }
 
+  /* The badge number: the same count the To grade view shows, so the two
+     always agree (active students only, this semester's classes only). */
+  async gradeCount(courses: TeacherCourse[]): Promise<number> {
+    const r = await this.toGrade(courses);
+    return r.value.reduce((s, x) => s + x.count, 0);
+  }
+
   async week(courses: TeacherCourse[]): Promise<Loaded<WeekDay[]>> {
     const failed: TeacherCourse[] = [];
     const data = await mapLimit(courses, PARALLEL, async (c) => {
@@ -229,15 +240,5 @@ export class Loader {
       }
     });
     return { value: buildWeek(data, this.now()), failed, partial: false };
-  }
-}
-
-/* Canvas's own count of assignments with something to grade, for the button badge. */
-export async function needsGradingCount(): Promise<number | null> {
-  try {
-    const r = await canvasGet<{ needs_grading_count?: number }>('/api/v1/users/self/todo_item_count');
-    return typeof r?.needs_grading_count === 'number' ? r.needs_grading_count : null;
-  } catch {
-    return null;
   }
 }

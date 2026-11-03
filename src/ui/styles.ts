@@ -101,3 +101,52 @@ details.row ul { margin: 8px 0 0; padding-left: 20px; font-size: 15px; }
 .linkbtn { background: none; border: 0; padding: 4px 6px; color: var(--link); cursor: pointer; font-size: 14px; text-decoration: underline; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 `;
+
+/*
+  The sidebar card sits inside Canvas's own right sidebar, so it matches
+  Canvas (light, Lato, 300px column) rather than following the OS dark
+  setting like the overlay panel does.
+*/
+export const CARD_CSS = `
+:host { all: initial; display: block; margin: 0 0 20px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.card {
+  font: 14px/1.4 Lato, "Lato Extended", "Segoe UI", system-ui, Arial, sans-serif;
+  color: #273540; background: #fff; border: 1px solid #c7cdd1; border-radius: 6px; overflow: hidden;
+}
+:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+button { font: inherit; color: inherit; }
+.head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #2a2a2a; color: #fff; border-bottom: 4px solid #C11430; }
+.mark { width: 24px; height: 24px; border-radius: 4px; background: #C11430; color: #fff; font-weight: 800; font-size: 11px; display: grid; place-items: center; flex: none; }
+.head h2 { margin: 0; font-size: 15px; font-weight: 700; flex: 1; }
+.open { background: transparent; color: #fff; border: 1px solid #6b6b6b; border-radius: 4px; padding: 2px 10px; font-size: 13px; cursor: pointer; }
+.open:hover { background: #3a3a3a; }
+.sec { padding: 6px 10px 10px; border-top: 1px solid #e5e8ea; }
+.head + .sec { border-top: 0; }
+.sec-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 0; background: none; border: 0; cursor: pointer; text-align: left; }
+.sec-head .label { font-weight: 700; font-size: 14px; color: #273540; }
+.sec-head:hover .label { text-decoration: underline; }
+.sec-head .chev { margin-left: auto; color: #6b7780; font-size: 18px; line-height: 1; }
+.pill { min-width: 22px; padding: 0 6px; border-radius: 999px; background: #e5e8ea; color: #273540; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+.pill.red { background: #C11430; color: #fff; }
+.muted { margin: 2px 0 0; color: #5b6870; font-size: 13px; }
+.muted.pad { padding: 12px 10px; margin: 0; }
+.line { margin: 2px 0 0; font-size: 14px; }
+.small { display: block; margin: 2px 0 0; color: #5b6870; font-size: 13px; overflow-wrap: anywhere; }
+.list { list-style: none; margin: 2px 0 0; padding: 0; }
+.list li { padding: 5px 0; border-bottom: 1px solid #eef0f1; }
+.list li:last-child { border-bottom: 0; }
+.list a { color: #0b5cad; text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+.list a:hover { text-decoration: underline; }
+.code { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #5b6870; }
+.more { margin-top: 4px; padding: 0; background: none; border: 0; color: #0b5cad; font-size: 13px; cursor: pointer; text-decoration: underline; text-align: left; }
+.strip { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin: 4px 0 2px; padding: 0; }
+.strip li { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 4px; background: #f3f4f5; }
+.strip li.some { background: #e7eef7; }
+.strip li.flag { background: #fdecef; box-shadow: inset 0 -3px 0 #C11430; }
+.strip .d { font-size: 11px; color: #5b6870; line-height: 1.2; }
+.strip li:first-child .d { font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.strip .n { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+`;

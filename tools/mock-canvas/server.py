@@ -135,32 +135,62 @@ def submissions_for(cid, state, aids):
     return out
 
 
+def term(name, start, end):
+    return {"id": name[:3], "name": name, "start_at": start, "end_at": end}
+
+
+SEM_NOW = term("2026/2027 - Regis Jesuit High School - 1st Semester", day(-90, 0, 0), day(60, 0, 0))
+SEM_NEXT = term("2026/2027 - Regis Jesuit High School - 2nd Semester", day(60, 0, 0), day(200, 0, 0))
+OLD_SEM = term("2025/2026 - Regis Jesuit High School - 2nd Semester", day(-400, 0, 0), day(-150, 0, 0))
+TERMS = {
+    "pd": term("Professional Development", None, None),
+    "activities": term("2026/2027 - Regis Jesuit High School - Year-Long Activities", day(-150, 0, 0), day(210, 0, 0)),
+    "default": term("Default Term", None, None),
+}
+
+
 def courses(as_student):
     if as_student:
         return [{"id": "201", "name": "Theology 9", "course_code": "THEOLOGY 9", "workflow_state": "available",
                  "enrollments": [{"type": "student"}], "term": {"end_at": None}}]
     t = lambda i, code, name, **kw: {"id": i, "name": name, "course_code": code, "workflow_state": "available",
                                      "enrollments": [{"type": kw.get("role", "teacher")}], "end_at": kw.get("end"),
-                                     "term": {"end_at": kw.get("term_end")},
+                                     "term": kw.get("term", SEM_NOW),
                                      "apply_assignment_group_weights": kw.get("weighted", False)}
     return [
         t("101", "ALGEBRA 1", "Algebra 1", weighted=True),
         t("102", "GEOMETRY", "Geometry"),
         t("103", "ADVISEMENT", "Advisement"),
-        t("199", "ALGEBRA 1 (2025)", "Algebra 1 last year", term_end="2026-05-29T06:00:00Z"),
+        t("199", "ALGEBRA 1 (2025)", "Algebra 1 last year", term=OLD_SEM),
         dict(t("150", "SANDBOX", "Unpublished sandbox"), workflow_state="unpublished"),
         t("201", "FACULTY PD", "Faculty PD", role="student"),
+        # taught, published and current, but not a semester class: left out by default
+        t("301", "EDTECH PD", "Educational Technology PD", term=TERMS["pd"]),
+        t("302", "RAIDERQUEST", "RaiderQuest 2026", term=TERMS["activities"]),
+        t("303", "DEMO", "Demo course", term=TERMS["default"]),
+        # next semester's class, already published
+        t("304", "THEOLOGY 1 S2", "Theology 1 (2nd semester)", term=SEM_NEXT),
     ]
 
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>{title}</title>
 <style>body{{margin:0;font-family:Lato,Arial,sans-serif;background:{bg};color:{fg}}}
 #header{{position:fixed;left:0;top:0;bottom:0;width:84px;background:#2a2a2a}}
-#main{{margin-left:84px;padding:24px 32px}} .card{{display:inline-block;width:240px;height:150px;margin:0 16px 16px 0;border-radius:6px;background:{card};box-shadow:0 1px 3px rgba(0,0,0,.2);vertical-align:top}}
+#main{{margin-left:84px;margin-right:{mr}px;padding:24px 32px}}
+#right-side-wrapper{{position:absolute;top:0;right:0;width:300px;padding:24px 16px}}
+@media (max-width:1000px){{#right-side-wrapper{{display:none}} #main{{margin-right:0}}}}
+.todo-list-header{{font-size:16px;margin:0 0 8px}} .ic-sidebar-logo{{height:40px;background:#eee;margin-bottom:16px}} .card{{display:inline-block;width:240px;height:150px;margin:0 16px 16px 0;border-radius:6px;background:{card};box-shadow:0 1px 3px rgba(0,0,0,.2);vertical-align:top}}
 .hero{{height:90px;border-radius:6px 6px 0 0}} .card a{{display:block;padding:8px 12px;color:inherit;font-weight:bold}}
 .sg{{position:fixed;right:0;bottom:0;left:84px;height:60px;background:#e4e7ea;border-top:1px solid #ccc;padding:16px}}
 .user_content{{border:1px dashed #aaa;padding:12px;margin-top:20px}}</style></head>
-<body><div id="header"></div><div id="main"><h1>{title}</h1>{body}</div></body></html>"""
+<body><div id="header"></div><div id="main"><h1>{title}</h1>{body}</div>{side}</body></html>"""
+
+DASH_SIDE = ('<div id="right-side-wrapper"><aside id="right-side"><div class="ic-sidebar-logo"></div>'
+             '<h2 class="todo-list-header">To Do</h2><ul class="right-side-list to-do-list"><li>Canvas To Do item</li></ul>'
+             '<div class="events_list coming_up">Coming Up</div></aside></div>')
+COURSE_SIDE = ('<div id="right-side-wrapper"><aside id="right-side"><div id="course_show_secondary">'
+               '<a href="#">Import Existing Content</a><a href="#">Choose Home Page</a></div>'
+               '<div class="events_list coming_up">Coming Up</div></aside></div>')
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -185,10 +215,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, "application/json; charset=utf-8", "while(1);" + json.dumps(data),
                   {"Link": link} if link else None)
 
-    def html(self, title, body, dark=False, extra=None):
+    def html(self, title, body, dark=False, extra=None, side=""):
         colors = dict(bg="#18181b" if dark else "#ffffff", fg="#e4e4e7" if dark else "#2D3B45",
                       card="#27272a" if dark else "#ffffff")
-        self.send(200, "text/html; charset=utf-8", PAGE.format(title=title, body=body, **colors), extra)
+        self.send(200, "text/html; charset=utf-8",
+                  PAGE.format(title=title, body=body, side=side, mr=320 if side else 0, **colors), extra)
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -204,7 +235,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/":
             cards = "".join(f'<div class="card"><div class="hero" style="background:{c}"></div><a href="/courses/{i}">{n}</a></div>'
                             for i, n, c in [("101", "Algebra 1", "#0B6E4F"), ("102", "Geometry", "#1D4ED8"), ("103", "Advisement", "#7A1F2B")])
-            return self.html("Dashboard", cards, dark)
+            return self.html("Dashboard", cards, dark, side=DASH_SIDE)
         if p.startswith("/courses/") and "/gradebook" in p:
             return self.html("SpeedGrader", '<div class="sg">SpeedGrader controls</div>', dark)
         if p == "/planted":
@@ -212,7 +243,8 @@ class Handler(BaseHTTPRequestHandler):
                     '<button data-rjtt>My Classes</button><div class="panel">Fake panel</div></div>')
             return self.html("Course page with planted content", fake, dark)
         if p.startswith("/courses/") and not p.startswith("/api"):
-            return self.html("Course", "<p>Course page</p>", dark)
+            home = len([x for x in p.split("/") if x]) == 2
+            return self.html("Course", "<p>Course page</p>", dark, side=COURSE_SIDE if home else "")
 
         if p == "/api/v1/courses":
             return self.json(courses(self.as_student()))

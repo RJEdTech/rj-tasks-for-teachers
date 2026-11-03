@@ -17,7 +17,7 @@ import { checkupView, failedNote, gradingView, studentsView, weekView } from './
 /* 'closed' in the shipped build; the test build uses 'open' so Playwright can see inside. */
 declare const SHADOW_MODE: 'open' | 'closed';
 
-type Tab = 'grade' | 'checkup' | 'students' | 'week';
+export type Tab = 'grade' | 'checkup' | 'students' | 'week';
 const TABS: Array<[Tab, string]> = [
   ['grade', 'To grade'],
   ['checkup', 'Check-up'],
@@ -31,6 +31,10 @@ export interface PanelOptions {
   showButton: boolean;
   openSettings: () => void;
   now?: () => Date;
+  /* shared with the sidebar card so nothing downloads twice */
+  loader?: Loader;
+  /* where focus goes when the panel closes and the button isn't showing */
+  onClosed?: () => void;
 }
 
 export class Panel {
@@ -55,7 +59,7 @@ export class Panel {
 
   constructor(private opts: PanelOptions) {
     this.now = opts.now ?? (() => new Date());
-    this.loader = new Loader(this.now);
+    this.loader = opts.loader ?? new Loader(this.now);
     this.host = document.createElement('div');
     this.host.setAttribute('data-rjtt', '');
     this.root = this.host.attachShadow({ mode: SHADOW_MODE });
@@ -109,12 +113,19 @@ export class Panel {
     }
   }
 
+  /* The floating button: shown only where there's no sidebar card in view. */
+  setLauncherVisible(v: boolean): void {
+    this.opts.showButton = v;
+    if (!this.isOpen()) this.launcher.hidden = !v;
+  }
+
   updateSettings(s: Settings): void {
     const prev = this.opts.settings;
     this.opts.settings = s;
     if (!s.hideNames) this.namesShown = true;
     if (!this.isOpen()) return;
-    const classesChanged = prev.excludedCourses.join(',') !== s.excludedCourses.join(',');
+    const classesChanged =
+      prev.excludedCourses.join(',') !== s.excludedCourses.join(',') || prev.allClasses !== s.allClasses;
     if (classesChanged) void this.loadCourses(); // course list is filtered, data stays cached
     else if (prev.missingThreshold !== s.missingThreshold || prev.hideNames !== s.hideNames) void this.renderTab();
   }
@@ -134,7 +145,17 @@ export class Panel {
     this.launcher.hidden = !this.opts.showButton;
     this.launcher.setAttribute('aria-expanded', 'false');
     this.namesShown = !this.opts.settings.hideNames; // re-hide names every time it closes
-    this.launcher.focus();
+    if (!this.launcher.hidden) this.launcher.focus();
+    else this.opts.onClosed?.();
+  }
+
+  /* Open at a given view, e.g. from a sidebar card section. scope is 'all'
+     or a course id; omitted keeps the current choice. */
+  async openAt(tab: Tab, scope?: string): Promise<void> {
+    if (!this.panel) this.build();
+    if (scope) this.scope = scope;
+    this.select(tab, false);
+    await this.openPanel();
   }
 
   async openPanel(): Promise<void> {
@@ -224,9 +245,10 @@ export class Panel {
     this.body.append(h('p', { class: 'empty' }, 'Loading your classes…'));
     this.setStatus('Loading…');
     try {
-      this.courses = await this.loader.courses(this.opts.settings.excludedCourses);
+      const all = this.opts.settings.allClasses;
+      this.courses = await this.loader.courses(this.opts.settings.excludedCourses, all);
       void this.loader
-        .courses([])
+        .courses([], all)
         .then((all) => saveKnownCourses(all))
         .catch(() => undefined);
     } catch {
@@ -258,7 +280,7 @@ export class Panel {
     clear(this.body);
     if (!this.courses.length) {
       this.body.append(
-        h('p', { class: 'empty' }, "You aren't listed as the teacher of any current Canvas classes."),
+        h('p', { class: 'empty' }, this.opts.settings.allClasses ? "You aren't listed as the teacher of any current Canvas classes." : "You aren't listed as the teacher of any classes this semester."),
         h('p', { class: 'note' }, 'If that seems wrong, check Settings for classes you turned off.')
       );
       this.setStatus('');

@@ -20,7 +20,6 @@ const ENDPOINTS: RegExp[] = [
   new RegExp(`^/api/v1/courses/${ID}/students/submissions$`),
   new RegExp(`^/api/v1/courses/${ID}/grading_periods$`),
   new RegExp(`^/api/v1/courses/${ID}/users$`),
-  /^\/api\/v1\/users\/self\/todo_item_count$/,
 ];
 
 export class CanvasApiError extends Error {

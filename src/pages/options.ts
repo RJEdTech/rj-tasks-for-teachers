@@ -35,11 +35,19 @@ async function init(): Promise<void> {
   btn.checked = settings.buttonOnGradingPages;
   btn.addEventListener('change', () => void save({ ...settings, buttonOnGradingPages: btn.checked }));
 
+  const sem = document.getElementById('semesterOnly') as HTMLInputElement;
+  sem.checked = !settings.allClasses;
+  sem.addEventListener('change', () => void save({ ...settings, allClasses: !sem.checked }));
+
+  const elsewhere = document.getElementById('buttonElsewhere') as HTMLInputElement;
+  elsewhere.checked = settings.buttonElsewhere;
+  elsewhere.addEventListener('change', () => void save({ ...settings, buttonElsewhere: elsewhere.checked }));
+
   const box = document.getElementById('classes')!;
   const known = await loadKnownCourses();
   clear(box);
   if (!known.length) {
-    box.append(h('p', { class: 'help' }, 'Open Canvas and click My Classes once, and your classes will show up here.'));
+    box.append(h('p', { class: 'help' }, 'Open Canvas and click My Classes once, and your classes will show up here. (After changing “Only this semester’s classes,” open My Classes again to refresh this list.)'));
   }
   for (const c of known) {
     const input = h('input', { type: 'checkbox' }) as HTMLInputElement;

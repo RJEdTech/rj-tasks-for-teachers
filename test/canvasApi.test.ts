@@ -28,7 +28,6 @@ describe('resolveApiUrl', () => {
       '/api/v1/courses/123/students/submissions?student_ids[]=all',
       '/api/v1/courses/123/grading_periods',
       '/api/v1/courses/123/users',
-      '/api/v1/users/self/todo_item_count',
     ])
       expect(resolveApiUrl(p).pathname).toMatch(/^\/api\/v1\//);
   });
@@ -40,6 +39,7 @@ describe('resolveApiUrl', () => {
       '/api/v1/courses/1/quizzes',
       '/api/graphql',
       '/api/v1/users/self/profile',
+      '/api/v1/users/self/todo_item_count', // dropped in 1.1: the badge uses the To grade count
       '/api/v1/courses/abc/assignments',
       '/api/v1/courses/1/../../users/self',
       '/login',
@@ -53,9 +53,9 @@ describe('resolveApiUrl', () => {
 
 describe('canvasGet', () => {
   it('sends GET only, same-origin credentials, refuses redirects, strips while(1);', async () => {
-    const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(respond({ needs_grading_count: 4 }));
-    const r = await canvasGet<{ needs_grading_count: number }>('/api/v1/users/self/todo_item_count');
-    expect(r.needs_grading_count).toBe(4);
+    const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(respond({ id: '4' }));
+    const r = await canvasGet<{ id: string }>('/api/v1/courses/4/grading_periods');
+    expect(r.id).toBe('4');
     const [, init] = f.mock.calls[0];
     expect(init).toMatchObject({ method: 'GET', credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     expect((init as RequestInit).body).toBeUndefined();

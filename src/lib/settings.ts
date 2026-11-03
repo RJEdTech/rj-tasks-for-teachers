@@ -8,6 +8,8 @@ export interface Settings {
   hideNames: boolean; // names stay hidden until "Show names" is clicked
   excludedCourses: string[]; // course ids the teacher chose to leave out
   buttonOnGradingPages: boolean; // show the button in SpeedGrader and the Gradebook
+  allClasses: boolean; // false: only this semester's academic classes
+  buttonElsewhere: boolean; // floating button on pages without the sidebar card
 }
 
 export const DEFAULTS: Settings = {
@@ -15,6 +17,8 @@ export const DEFAULTS: Settings = {
   hideNames: true,
   excludedCourses: [],
   buttonOnGradingPages: false,
+  allClasses: false,
+  buttonElsewhere: true,
 };
 
 const THRESHOLDS = [1, 2, 3, 4, 5];
@@ -32,6 +36,8 @@ export function clean(raw: unknown): Settings {
       : [],
     buttonOnGradingPages:
       typeof r.buttonOnGradingPages === 'boolean' ? r.buttonOnGradingPages : DEFAULTS.buttonOnGradingPages,
+    allClasses: typeof r.allClasses === 'boolean' ? r.allClasses : DEFAULTS.allClasses,
+    buttonElsewhere: typeof r.buttonElsewhere === 'boolean' ? r.buttonElsewhere : DEFAULTS.buttonElsewhere,
   };
 }
 

@@ -8,7 +8,9 @@ Homepage, install steps and privacy policy: <https://rjedtech.github.io/rj-tasks
 
 ## What teachers see
 
-A **My Classes** button in the corner of Canvas opens a panel with four tabs. It's scoped to one class on a course page, or to all classes on the dashboard.
+A **My Classes** card sits in Canvas's own right sidebar: on the Dashboard it covers all your classes, and on a class's home page it covers that class. Each section opens the full panel with four tabs. On other Canvas pages (or when the window is too narrow for Canvas's sidebar) a **My Classes** button in the corner opens the same panel.
+
+By default it only reads **this semester's academic classes**: courses in RJ's current *1st Semester* or *2nd Semester* term, which are the classes under Academic Courses. PD courses, RaiderQuest, clubs, templates and sandboxes are left out. Settings has a switch to include every course you teach.
 
 | Tab | What it does |
 |---|---|
@@ -17,7 +19,7 @@ A **My Classes** button in the corner of Canvas opens a panel with four tabs. It
 | **Students** | Students with at least N missing assignments this grading period (N is 3 by default). It uses Canvas's own Missing flag. Names stay hidden until **Show names** is clicked, and hide again when the panel closes, in case the screen is projected. **Copy list** gives plain text for an email. |
 | **Week** | What's due from your classes each of the next 7 days. It flags any day where one class or section has two or more graded items due. Canvas doesn't let teachers see other teachers' courses, so this covers your classes only. |
 
-The button only appears for people who teach or TA a current Canvas class. It stays out of SpeedGrader and the Gradebook unless turned on in Settings.
+The card and button only appear for people who teach or TA a class this semester. The button stays out of SpeedGrader and the Gradebook unless turned on in Settings. The sidebar card never shows student names, only counts.
 
 ## Security and privacy design
 

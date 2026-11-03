@@ -1,4 +1,4 @@
-import { teacherCourses, isCurrentTeachingCourse } from '../src/data/courses';
+import { teacherCourses, isCurrentTeachingCourse, isSemesterTerm, isCurrentSemester, isShownCourse } from '../src/data/courses';
 import { buildQueue, queueFromCounts, sortQueue } from '../src/data/grading';
 import { runCheckup, sortIssues } from '../src/data/checkup';
 import { buildStudents, currentPeriod, pastDueIds, studentsAsText, chunk } from '../src/data/students';
@@ -25,7 +25,15 @@ function a(over: Partial<CanvasAssignment> & { id: string }): CanvasAssignment {
 }
 
 describe('courses', () => {
-  const base: CanvasCourse = { id: '1', name: 'Algebra 1', course_code: 'ALGEBRA 1', workflow_state: 'available', enrollments: [{ type: 'teacher' }] };
+  // RJ's real terms, as Canvas returns them with include[]=term
+  const S1 = { id: '585', name: '2026/2027 - Regis Jesuit High School - 1st Semester', start_at: '2026-07-11T06:00:00Z', end_at: '2027-01-01T06:59:00Z' };
+  const S2 = { id: '586', name: '2026/2027 - Regis Jesuit High School - 2nd Semester', start_at: '2027-01-01T07:00:00Z', end_at: '2027-06-01T05:59:00Z' };
+  const PD = { id: '187', name: 'Professional Development', start_at: null, end_at: null };
+  const DEF = { id: '1', name: 'Default Term', start_at: null, end_at: null };
+  const ACT = { id: '588', name: '2026/2027 - Regis Jesuit High School - Year-Long Activities', start_at: '2026-06-01T06:00:00Z', end_at: '2027-06-01T05:59:00Z' };
+  const SUM = { id: '587', name: '2026/2027 - Regis Jesuit High School - Summer Semester', start_at: '2026-06-01T06:00:00Z', end_at: '2026-07-11T05:59:00Z' };
+  const OLD = { id: '365', name: 'x2022/2023 - Regis Jesuit High School - 1st Semester', start_at: '2022-07-18T06:00:00Z', end_at: '2023-01-01T06:59:00Z' };
+  const base: CanvasCourse = { id: '1', name: 'Algebra 1', course_code: 'ALGEBRA 1', workflow_state: 'available', enrollments: [{ type: 'teacher' }], term: S1 };
   it('keeps current courses where you are teacher or TA', () => {
     expect(isCurrentTeachingCourse(base, NOW)).toBe(true);
     expect(isCurrentTeachingCourse({ ...base, enrollments: [{ type: 'ta' }] }, NOW)).toBe(true);
@@ -38,6 +46,34 @@ describe('courses', () => {
     expect(isCurrentTeachingCourse({ ...base, workflow_state: 'unpublished' }, NOW)).toBe(false);
     expect(isCurrentTeachingCourse({ ...base, term: { end_at: '2026-05-30T06:00:00Z' } }, NOW)).toBe(false);
     expect(isCurrentTeachingCourse({ ...base, workflow_state: 'completed' }, NOW)).toBe(false);
+  });
+  it('knows which terms are RJ semesters', () => {
+    expect([S1, S2].every(isSemesterTerm)).toBe(true);
+    expect([PD, DEF, ACT, SUM, OLD, null, undefined].some(isSemesterTerm)).toBe(false);
+  });
+  it('picks the semester in session by its dates', () => {
+    expect(isCurrentSemester(S1, NOW)).toBe(true);
+    expect(isCurrentSemester(S2, NOW)).toBe(false);
+    expect(isCurrentSemester(S2, new Date(2027, 1, 3))).toBe(true);
+    expect(isCurrentSemester(S1, new Date(2027, 1, 3))).toBe(false);
+    // the 1st/2nd semester boundary (Dec 31 11:59 PM -> Jan 1 12:00 AM Denver)
+    expect(isCurrentSemester(S1, new Date('2027-01-01T06:58:00Z'))).toBe(true);
+    expect(isCurrentSemester(S2, new Date('2027-01-01T07:00:00Z'))).toBe(true);
+  });
+  it('shows only this semester (plus the certification sandbox) unless All classes is on', () => {
+    const list = [
+      base,
+      { ...base, id: '2', course_code: 'GEOMETRY', name: 'Geometry', term: S2 }, // next semester (already published)
+      { ...base, id: '3', course_code: 'PD', name: 'Educational Technology', term: PD },
+      { ...base, id: '4', course_code: 'RQ', name: 'RaiderQuest 2025', term: ACT },
+      { ...base, id: '5', course_code: 'DEMO', name: 'Demo', term: DEF },
+      { ...base, id: '17272', course_code: 'RJ TASKS REVIEW', name: 'RJ Tasks Review', term: DEF },
+      { ...base, id: '6', course_code: 'NOTERM', name: 'No term' , term: undefined },
+    ];
+    expect(teacherCourses(list, NOW).map((c) => c.id)).toEqual(['1', '17272']);
+    expect(teacherCourses(list, NOW, [], true).map((c) => c.id).sort()).toEqual(['1', '17272', '2', '3', '4', '5', '6']);
+    expect(isShownCourse({ ...base, enrollments: [{ type: 'student' }] }, NOW)).toBe(false);
+    expect(isShownCourse({ ...base, workflow_state: 'unpublished' }, NOW)).toBe(false);
   });
   it('applies exclusions and sorts by code', () => {
     const list = teacherCourses(

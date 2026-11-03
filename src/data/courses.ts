@@ -1,5 +1,6 @@
-import { CanvasCourse, TeacherCourse } from '../lib/types';
+import { CanvasCourse, CanvasTerm, TeacherCourse } from '../lib/types';
 import { parse } from '../lib/dates';
+import { REVIEW_COURSE_IDS } from '../lib/constants';
 
 const TEACHING = new Set(['teacher', 'ta']);
 
@@ -14,6 +15,39 @@ export function isCurrentTeachingCourse(c: CanvasCourse, now: Date): boolean {
   return true;
 }
 
+/*
+  RJ's academic classes come from the SIS in terms named like
+  "2026/2027 - Regis Jesuit High School - 1st Semester". Every course in those
+  terms sits under Academic Courses in Canvas; PD, RaiderQuest, clubs,
+  templates and sandboxes use other terms (Professional Development,
+  Activities, Default Term, Master Templates, Year-Long Activities, Summer).
+  Retired terms start with "x".
+*/
+const SEMESTER = /\b(1st|2nd)\s+semester\b/i;
+
+export function isSemesterTerm(t: CanvasTerm | null | undefined): boolean {
+  const name = (t?.name ?? '').trim();
+  return SEMESTER.test(name) && !/summer/i.test(name) && !/^x/i.test(name);
+}
+
+/* The semester term in session right now (start <= now < end), if any. */
+export function isCurrentSemester(t: CanvasTerm | null | undefined, now: Date): boolean {
+  if (!isSemesterTerm(t)) return false;
+  const start = parse(t!.start_at ?? null);
+  const end = parse(t!.end_at ?? null);
+  if (!start || !end) return false;
+  return start.getTime() <= now.getTime() && now.getTime() < end.getTime();
+}
+
+/* Courses the extension shows: current-semester academic classes, plus the
+   Microsoft certification sandbox so Edge Add-ons reviewers can test it.
+   With allClasses on, every current class the teacher teaches (the 1.0 behavior). */
+export function isShownCourse(c: CanvasCourse, now: Date, allClasses = false): boolean {
+  if (!isCurrentTeachingCourse(c, now)) return false;
+  if (allClasses) return true;
+  return isCurrentSemester(c.term, now) || REVIEW_COURSE_IDS.includes(String(c.id));
+}
+
 export function toTeacherCourse(c: CanvasCourse): TeacherCourse {
   return {
     id: String(c.id),
@@ -26,11 +60,12 @@ export function toTeacherCourse(c: CanvasCourse): TeacherCourse {
 export function teacherCourses(
   all: CanvasCourse[],
   now: Date,
-  excluded: string[] = []
+  excluded: string[] = [],
+  allClasses = false
 ): TeacherCourse[] {
   const skip = new Set(excluded.map(String));
   return all
-    .filter((c) => isCurrentTeachingCourse(c, now))
+    .filter((c) => isShownCourse(c, now, allClasses))
     .map(toTeacherCourse)
     .filter((c) => !skip.has(c.id))
     .sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }));

@@ -85,23 +85,49 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await $(`.tab[data-tab="${name}"]`).click();
   };
 
-  // ---------- dashboard ----------
-  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
-  await $('.launcher').waitFor({ timeout: 10000 });
-  check('teacher: My Classes button appears', true);
-  await page.waitForFunction(
-    () => {
-      const h = document.querySelector('div[data-rjtt]');
-      const b = h && h.shadowRoot && h.shadowRoot.querySelector('.badge');
-      return b && !b.hidden;
-    },
-    null,
-    { timeout: 5000 }
-  ).catch(() => undefined);
-  check('button badge shows Canvas to-grade count', (await text('.badge')) === '4', await text('.badge'));
+  const C = 'div[data-rjtt-card]';
+  const $c = (sel) => page.locator(`${C} >> css=${sel}`);
+  const cardText = async () => ((await $c('.card').first().textContent()) || '').replace(/\s+/g, ' ');
+  const waitCard = async () => {
+    for (let i = 0; i < 80; i++) {
+      const t = await cardText().catch(() => '');
+      if (t && !/Loading/.test(t)) return t;
+      await sleep(100);
+    }
+    return cardText();
+  };
 
-  await page.screenshot({ path: path.join(OUT, '0-button.png') });
-  await $('.launcher').click();
+  // ---------- dashboard: sidebar card ----------
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator(C).waitFor({ timeout: 10000 });
+  const placement = await page.evaluate(() => {
+    const host = document.querySelector('div[data-rjtt-card]');
+    return host.parentElement.id + '|' + (host.nextElementSibling && host.nextElementSibling.className);
+  });
+  check('Dashboard: card sits in Canvas\'s right sidebar, above To Do', placement === 'right-side|todo-list-header', placement);
+  let ct = await waitCard();
+  check('Dashboard card: To grade count and oldest-first rows', /To grade\s*15/.test(ct) && (await $c('.list li').count()) === 3, ct.slice(0, 160));
+  check('Dashboard card: rows link to SpeedGrader', (await $c('.list a').first().getAttribute('href')) === `${BASE}/courses/101/gradebook/speed_grader?assignment_id=1001`);
+  check('Dashboard card: Check-up summary', /4 to fix · 3 worth a look/.test(ct), ct);
+  check('Dashboard card: Students as a count only, never names', /3 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|img/.test(ct), ct);
+  check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /items? due in the next 7 days/.test(ct));
+  check('Dashboard card: only this semester\'s classes', !/EDTECH|RAIDERQUEST|DEMO|THEOLOGY 1 S2/.test(ct));
+  check('Dashboard: no floating button while the card is showing', !(await $('.launcher').isVisible()));
+  await page.waitForFunction(() => {
+    const h = document.querySelector('div[data-rjtt]');
+    const b = h && h.shadowRoot && h.shadowRoot.querySelector('.badge');
+    return b && b.textContent === '15';
+  }, null, { timeout: 5000 }).catch(() => undefined);
+  check('badge uses the same count as To grade', (await text('.badge')) === '15', await text('.badge'));
+  await page.screenshot({ path: path.join(OUT, '0-dashboard-card.png') });
+  await page.locator(C).screenshot({ path: path.join(OUT, '0b-card.png') });
+
+  await $c('.sec[data-sec="week"] .sec-head').click();
+  await $('.panel').waitFor();
+  check('card: a section opens the full view at that tab', (await $('.tab[data-tab="week"]').getAttribute('aria-selected')) === 'true');
+  await page.keyboard.press('Escape');
+  await sleep(150);
+  await $c('.open').click();
   await $('.panel').waitFor();
   const focused = await page.evaluate(() => {
     const h = document.querySelector('div[data-rjtt]');
@@ -110,8 +136,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('panel opens with focus on its heading', focused === 'rjtt-title', focused);
   const scopeOpts = await $('select#rjtt-scope option').allTextContents();
   check(
-    'only current classes you teach (ended and student enrollments left out)',
-    scopeOpts.length === 4 && scopeOpts[0] === 'All my classes (3)' && !scopeOpts.some((o) => /2025|PD/.test(o)),
+    'only this semester\'s classes you teach (other terms, ended and student enrollments left out)',
+    scopeOpts.length === 4 && scopeOpts[0] === 'All my classes (3)' && !scopeOpts.some((o) => /2025|PD|RAIDERQUEST|DEMO|S2/.test(o)),
     scopeOpts.join(' | ')
   );
 
@@ -179,10 +205,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // close and reopen: names hidden again
   await page.keyboard.press('Escape');
   await sleep(150);
-  const launcherVisibleAfterEsc = await $('.launcher').isVisible();
-  const focusBack = await page.evaluate(() => document.querySelector('div[data-rjtt]').shadowRoot.activeElement?.className);
-  check('Escape closes the panel and returns focus to the button', launcherVisibleAfterEsc && focusBack === 'launcher', focusBack);
-  await $('.launcher').click();
+  const panelGone = !(await $('.panel').isVisible());
+  const focusBack = await page.evaluate(() => document.activeElement && document.activeElement.hasAttribute('data-rjtt-card'));
+  check('Escape closes the panel and returns focus to the sidebar card', panelGone && focusBack, String(focusBack));
+  await $c('.open').click();
   await tab('students');
   t = await waitBody(/missing this grading period/);
   check('Students: names hide again after closing the panel', /Names are hidden/.test(t) && !/Casey/.test(t));
@@ -202,19 +228,41 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Week: says it only covers your classes', /Canvas doesn't let teachers see/.test(t));
   await page.screenshot({ path: path.join(OUT, '4-week.png') });
 
-  // ---------- course page scoping ----------
+  // ---------- course home: card for that class ----------
   await page.goto(BASE + '/courses/102', { waitUntil: 'domcontentloaded' });
-  await $('.launcher').waitFor();
-  await $('.launcher').click();
+  await page.locator(C).waitFor({ timeout: 10000 });
+  const cplace = await page.evaluate(() => document.querySelector('div[data-rjtt-card]').previousElementSibling.id);
+  check('course home: card sits under the teacher buttons', cplace === 'course_show_secondary', cplace);
+  ct = await waitCard();
+  check('course home: card is for that class only', /This class/.test(ct) && /To grade\s*4/.test(ct) && !/ALGEBRA/.test(ct), ct.slice(0, 120));
+  await $c('.sec[data-sec="grade"] .sec-head').click();
   t = await waitBody(/to grade|Nothing/);
   const scopeVal = await $('select#rjtt-scope').inputValue();
-  check('course page: panel starts on that class', scopeVal === '102' && /4 submissions to grade in 1 assignment/.test(t), `${scopeVal} ${t.slice(0, 50)}`);
+  check('course home: full view starts on that class', scopeVal === '102' && /4 submissions to grade in 1 assignment/.test(t), `${scopeVal} ${t.slice(0, 50)}`);
+  await page.screenshot({ path: path.join(OUT, '4b-course-home.png') });
+
+  await page.goto(BASE + '/courses/102/assignments', { waitUntil: 'domcontentloaded' });
+  await $('.launcher').waitFor({ timeout: 10000 });
+  check('other class pages: floating button, no card', (await page.locator(C).count()) === 0);
+  await page.goto(BASE + '/courses/301', { waitUntil: 'domcontentloaded' });
+  await $('.launcher').waitFor({ timeout: 10000 });
+  check('home page of a non-semester course (PD): no card', (await page.locator(C).count()) === 0);
+
+  // ---------- narrow window: Canvas hides its sidebar ----------
+  await page.setViewportSize({ width: 900, height: 800 });
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator(C).waitFor({ state: 'attached', timeout: 10000 });
+  await $('.launcher').waitFor({ timeout: 5000 }).catch(() => undefined);
+  check('narrow window: sidebar hidden, so the floating button appears', await $('.launcher').isVisible());
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await sleep(400);
+  check('wide again: button steps aside for the card', !(await $('.launcher').isVisible()));
 
   // ---------- dark mode ----------
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto(BASE + '/?dark=1', { waitUntil: 'domcontentloaded' });
-  await $('.launcher').waitFor();
-  await $('.launcher').click();
+  await page.locator(C).waitFor();
+  await $c('.open').click();
   await waitBody(/to grade/);
   const bg = await $('.panel').evaluate((e) => getComputedStyle(e).backgroundColor);
   check('dark mode: neutral charcoal panel', bg === 'rgb(21, 22, 26)', bg);
@@ -244,10 +292,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await opt.waitForSelector('#saved:has-text("Saved")');
   await opt.screenshot({ path: path.join(OUT, '6-settings.png'), fullPage: true });
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
-  await $('.launcher').click();
+  await page.locator(C).waitFor();
+  await $c('.open').click();
   await waitBody(/to grade/);
   const after = await $('select#rjtt-scope option').allTextContents();
   check('settings: a class turned off disappears from the panel', after[0] === 'All my classes (2)' && !after.some((o) => /ADVISEMENT/.test(o)), after.join(' | '));
+
+  await opt.bringToFront();
+  await opt.locator('#semesterOnly').uncheck();
+  await opt.waitForSelector('#saved:has-text("Saved")');
+  await page.bringToFront();
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator(C).waitFor();
+  await $c('.open').click();
+  await waitBody(/to grade/);
+  const wide = await $('select#rjtt-scope option').allTextContents();
+  check('settings: "Only this semester" off brings back PD and other courses', wide[0] === 'All my classes (6)' && wide.some((o) => /EDTECH/.test(o)), wide.join(' | '));
+  await opt.locator('#semesterOnly').check();
+  await opt.waitForSelector('#saved:has-text("Saved")');
 
   const pop = await ctx.newPage();
   watch(pop);
@@ -262,7 +324,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await stu.goto(BASE + '/__as_student');
   await stu.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await sleep(2000);
-  check('student: no button at all', (await stu.locator('div[data-rjtt]').count()) === 0);
+  check('student: no button and no card', (await stu.locator('div[data-rjtt]').count()) === 0 && (await stu.locator('div[data-rjtt-card]').count()) === 0);
   await stu.goto(BASE + '/__as_teacher');
 
   // ---------- network ----------
