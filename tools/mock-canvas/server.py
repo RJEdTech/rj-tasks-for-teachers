@@ -20,6 +20,7 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8444
 HERE = __file__.rsplit("/", 1)[0]
 TZ = ZoneInfo("America/Denver")
 WRITES = []
+API_COUNT = [0]
 
 
 def now():
@@ -185,9 +186,14 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>{title}</title
 .user_content{{border:1px dashed #aaa;padding:12px;margin-top:20px}}</style></head>
 <body><div id="header"></div><div id="main"><h1>{title}</h1>{body}</div>{side}</body></html>"""
 
-DASH_SIDE = ('<div id="right-side-wrapper"><aside id="right-side"><div class="ic-sidebar-logo"></div>'
-             '<h2 class="todo-list-header">To Do</h2><ul class="right-side-list to-do-list"><li>Canvas To Do item</li></ul>'
-             '<div class="events_list coming_up">Coming Up</div></aside></div>')
+# Like real Canvas: the Dashboard sidebar starts as a placeholder and is
+# filled from /dashboard-sidebar after the page loads, replacing its contents.
+DASH_SIDE = ('<div id="right-side-wrapper"><aside id="right-side"><div class="placeholder"></div></aside></div>'
+             '<script>setTimeout(function(){fetch("/dashboard-sidebar").then(function(r){return r.text()})'
+             '.then(function(t){document.getElementById("right-side").innerHTML=t})},700)</script>')
+DASH_SIDE_BODY = ('<div class="ic-sidebar-logo"></div><h2 class="todo-list-header">To Do</h2>'
+                  '<ul class="right-side-list to-do-list"><li>Canvas To Do item</li></ul>'
+                  '<div class="events_list coming_up">Coming Up</div>')
 COURSE_SIDE = ('<div id="right-side-wrapper"><aside id="right-side"><div id="course_show_secondary">'
                '<a href="#">Import Existing Content</a><a href="#">Choose Home Page</a></div>'
                '<div class="events_list coming_up">Coming Up</div></aside></div>')
@@ -230,6 +236,10 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/__as_teacher":
             return self.html("Teacher", "<p>Now a teacher.</p>",
                              extra={"Set-Cookie": "as=; Path=/; Secure; Max-Age=0"})
+        if p == "/dashboard-sidebar":
+            return self.send(200, "text/html; charset=utf-8", DASH_SIDE_BODY)
+        if p == "/__api_count":
+            return self.json({"n": API_COUNT[0]})
         if p == "/__writes":
             return self.json(WRITES)
         if p == "/":
@@ -246,6 +256,8 @@ class Handler(BaseHTTPRequestHandler):
             home = len([x for x in p.split("/") if x]) == 2
             return self.html("Course", "<p>Course page</p>", dark, side=COURSE_SIDE if home else "")
 
+        if p.startswith("/api/v1/courses/"):
+            API_COUNT[0] += 1
         if p == "/api/v1/courses":
             return self.json(courses(self.as_student()))
         if p == "/api/v1/users/self/todo_item_count":

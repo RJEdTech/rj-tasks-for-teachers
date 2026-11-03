@@ -12,9 +12,10 @@ import { isShownCourse } from './data/courses';
 import { Loader } from './data/loader';
 import { loadSettings, onSettingsChanged, Settings } from './lib/settings';
 import { Panel } from './ui/panel';
-import { SidebarCard, cardSlot, isShown } from './ui/card';
+import { SidebarCard, cardSlot, inSlot, isShown, clearCardCache } from './ui/card';
 
-const ROLE_KEY = 'rjtt-teaches-v2'; // sessionStorage: '1' or '0' per filter, this browser session only
+const ROLE_KEY = 'rjtt-teaches-v2'; // sessionStorage: {v: 0|1, t} per filter, this tab only
+const ROLE_TTL_MS = 60 * 60 * 1000; // re-check hourly, so a new semester shows up without closing the tab
 const BADGE_KEY = 'rjtt-badge-v2'; // sessionStorage: {n, t, k}, a number only
 const BADGE_TTL_MS = 5 * 60 * 1000;
 
@@ -58,15 +59,19 @@ function filterKey(s: Settings): string {
 
 async function teachesSomething(s: Settings): Promise<boolean> {
   const key = `${ROLE_KEY}:${s.allClasses ? 'all' : 'sem'}`;
-  const cached = readSession(key);
-  if (cached === '1' || cached === '0') return cached === '1';
+  try {
+    const c = JSON.parse(readSession(key) || 'null') as { v?: unknown; t?: unknown } | null;
+    if (c && typeof c.t === 'number' && Date.now() - c.t < ROLE_TTL_MS && (c.v === 0 || c.v === 1)) return c.v === 1;
+  } catch {
+    /* bad cache entry: ask Canvas */
+  }
   const { items } = await canvasGetAll<CanvasCourse>(
     '/api/v1/courses?enrollment_state=active&include[]=term&per_page=100',
     4
   );
   const now = new Date();
   const yes = items.some((c) => isShownCourse(c, now, s.allClasses));
-  writeSession(key, yes ? '1' : '0');
+  writeSession(key, JSON.stringify({ v: yes ? 1 : 0, t: Date.now() }));
   return yes;
 }
 
@@ -123,7 +128,8 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
         /* ignore */
       }
     },
-    onClosed: () => card?.host.focus(),
+    onClosed: () => card?.focusLast(),
+    onDataChanged: () => card?.refresh(),
   });
   document.documentElement.appendChild(panel.host);
 
@@ -141,16 +147,40 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
     }
     const slot = wanted ? cardSlot(document, kind) : null;
     if (slot) {
-      card = new SidebarCard({
+      const c = new SidebarCard({
         loader,
         settings,
         courseId: kind === 'course' ? courseId : null,
         onOpen: (tab) => void panel.openAt(tab, kind === 'course' ? courseId! : 'all'),
         onGradeCount: kind === 'dashboard' ? (n) => setBadge(n) : undefined,
       });
-      card.host.tabIndex = -1;
-      slot.parent.insertBefore(card.host, slot.before);
-      void card.load();
+      card = c;
+      slot.parent.insertBefore(c.host, slot.before);
+      void c.load();
+
+      // Canvas fills the Dashboard sidebar after the page loads, replacing
+      // what's in it. Put the card back (above To Do) whenever that happens.
+      const side = slot.parent;
+      const watchRoot = side.parentElement ?? side;
+      let queued = false;
+      const keepInPlace = () => {
+        queued = false;
+        const now = cardSlot(document, kind);
+        if (!now) return placeButton();
+        if (!inSlot(c.host, now)) now.parent.insertBefore(c.host, now.before);
+        placeButton();
+      };
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        window.requestAnimationFrame(keepInPlace);
+      }).observe(watchRoot, { childList: true, subtree: true });
+      // Canvas hides its sidebar in narrow windows: show the button then.
+      try {
+        new ResizeObserver(() => placeButton()).observe(c.host);
+      } catch {
+        /* older browser: the resize listener below covers it */
+      }
     }
   }
 
@@ -173,23 +203,22 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
     const reload = filterKey(s) !== filterKey(settings) || s.missingThreshold !== settings.missingThreshold;
     settings = s;
     panel.updateSettings(s);
+    if (reload) clearCardCache();
     if (card && reload) card.updateSettings(s);
+    if (reload) showCachedBadge();
     placeButton();
   });
 
-  // Toolbar and button badge: this semester's to-grade count (the Dashboard
-  // card sets it as soon as its To grade section loads).
-  const cached = cachedBadge(settings);
-  if (cached !== null) {
+  // Toolbar and button badge: this semester's to-grade count. Only the
+  // Dashboard card (or the panel's To grade view) works it out; other pages
+  // reuse that number for 5 minutes and otherwise ask Canvas for nothing.
+  function showCachedBadge(): void {
+    const cached = cachedBadge(settings);
     panel.setBadge(cached);
     sendBadge(cached);
-  } else if (!(card && kind === 'dashboard')) {
-    void loader
-      .courses(settings.excludedCourses, settings.allClasses)
-      .then((cs) => loader.gradeCount(cs))
-      .then((n) => setBadge(n))
-      .catch(() => undefined);
   }
+  showCachedBadge();
+  panel.onGradeTotal = (n) => setBadge(n);
   return { panel, card };
 }
 

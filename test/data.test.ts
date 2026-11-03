@@ -51,9 +51,13 @@ describe('courses', () => {
     expect([S1, S2].every(isSemesterTerm)).toBe(true);
     expect([PD, DEF, ACT, SUM, OLD, null, undefined].some(isSemesterTerm)).toBe(false);
   });
-  it('picks the semester in session by its dates', () => {
+  it('picks the semester in session by its dates (and the next one 14 days early)', () => {
     expect(isCurrentSemester(S1, NOW)).toBe(true);
     expect(isCurrentSemester(S2, NOW)).toBe(false);
+    expect(isCurrentSemester(S2, new Date(2026, 11, 17))).toBe(false); // 15 days before
+    expect(isCurrentSemester(S2, new Date(2026, 11, 19))).toBe(true); // over break: prep next semester
+    expect(isCurrentSemester({ ...S1, start_at: null }, NOW)).toBe(true); // no start date: counts as started
+    expect(isCurrentSemester({ ...S1, start_at: null, end_at: null }, NOW)).toBe(true);
     expect(isCurrentSemester(S2, new Date(2027, 1, 3))).toBe(true);
     expect(isCurrentSemester(S1, new Date(2027, 1, 3))).toBe(false);
     // the 1st/2nd semester boundary (Dec 31 11:59 PM -> Jan 1 12:00 AM Denver)
@@ -74,6 +78,10 @@ describe('courses', () => {
     expect(teacherCourses(list, NOW, [], true).map((c) => c.id).sort()).toEqual(['1', '17272', '2', '3', '4', '5', '6']);
     expect(isShownCourse({ ...base, enrollments: [{ type: 'student' }] }, NOW)).toBe(false);
     expect(isShownCourse({ ...base, workflow_state: 'unpublished' }, NOW)).toBe(false);
+    // a course with its own enforced end date past the term's end
+    const late = new Date(2027, 0, 10);
+    expect(isShownCourse({ ...base, restrict_enrollments_to_course_dates: true, end_at: '2027-01-20T06:00:00Z' }, late)).toBe(true);
+    expect(isShownCourse(base, late)).toBe(false);
   });
   it('applies exclusions and sorts by code', () => {
     const list = teacherCourses(

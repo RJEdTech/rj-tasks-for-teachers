@@ -100,12 +100,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ---------- dashboard: sidebar card ----------
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await page.locator(C).waitFor({ timeout: 10000 });
+  let ct = await waitCard();
+  await page.waitForFunction(() => document.querySelector('.todo-list-header'), null, { timeout: 5000 });
+  await sleep(300);
   const placement = await page.evaluate(() => {
     const host = document.querySelector('div[data-rjtt-card]');
-    return host.parentElement.id + '|' + (host.nextElementSibling && host.nextElementSibling.className);
+    return host && host.parentElement.id + '|' + (host.nextElementSibling && host.nextElementSibling.className);
   });
-  check('Dashboard: card sits in Canvas\'s right sidebar, above To Do', placement === 'right-side|todo-list-header', placement);
-  let ct = await waitCard();
+  check('Dashboard: after Canvas fills its sidebar, the card is back in it, above To Do', placement === 'right-side|todo-list-header', placement);
   check('Dashboard card: To grade count and oldest-first rows', /To grade\s*15/.test(ct) && (await $c('.list li').count()) === 3, ct.slice(0, 160));
   check('Dashboard card: rows link to SpeedGrader', (await $c('.list a').first().getAttribute('href')) === `${BASE}/courses/101/gradebook/speed_grader?assignment_id=1001`);
   check('Dashboard card: Check-up summary', /4 to fix · 3 worth a look/.test(ct), ct);
@@ -121,6 +123,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('badge uses the same count as To grade', (await text('.badge')) === '15', await text('.badge'));
   await page.screenshot({ path: path.join(OUT, '0-dashboard-card.png') });
   await page.locator(C).screenshot({ path: path.join(OUT, '0b-card.png') });
+
+  const apiCount = async () => JSON.parse(((await (await ctx.request.get(`https://127.0.0.1:${PORT}/__api_count`)).text()) || '').replace(/^while\(1\);/, '')).n;
+  const before = await apiCount();
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator(C).waitFor();
+  ct = await waitCard();
+  check('Dashboard again within 5 minutes: card comes from this tab\'s cache, no class data re-downloaded', (await apiCount()) === before && /To grade\s*15/.test(ct), `${before} -> ${await apiCount()}`);
+  await sleep(900);
 
   await $c('.sec[data-sec="week"] .sec-head').click();
   await $('.panel').waitFor();

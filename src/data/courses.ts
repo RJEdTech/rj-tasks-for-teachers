@@ -30,22 +30,36 @@ export function isSemesterTerm(t: CanvasTerm | null | undefined): boolean {
   return SEMESTER.test(name) && !/summer/i.test(name) && !/^x/i.test(name);
 }
 
-/* The semester term in session right now (start <= now < end), if any. */
+/* Show a semester's classes this many days before it starts, so teachers can
+   set up next semester over break. */
+export const LEAD_DAYS = 14;
+
+/*
+  The semester term in session (or starting within LEAD_DAYS). A missing
+  start date counts as started; a missing end date as not ended.
+*/
 export function isCurrentSemester(t: CanvasTerm | null | undefined, now: Date): boolean {
   if (!isSemesterTerm(t)) return false;
   const start = parse(t!.start_at ?? null);
   const end = parse(t!.end_at ?? null);
-  if (!start || !end) return false;
-  return start.getTime() <= now.getTime() && now.getTime() < end.getTime();
+  if (end && end.getTime() <= now.getTime()) return false;
+  return !start || start.getTime() - LEAD_DAYS * 86400000 <= now.getTime();
 }
 
-/* Courses the extension shows: current-semester academic classes, plus the
+/* Courses the extension shows: this semester's academic classes, plus the
    Microsoft certification sandbox so Edge Add-ons reviewers can test it.
    With allClasses on, every current class the teacher teaches (the 1.0 behavior). */
 export function isShownCourse(c: CanvasCourse, now: Date, allClasses = false): boolean {
   if (!isCurrentTeachingCourse(c, now)) return false;
   if (allClasses) return true;
-  return isCurrentSemester(c.term, now) || REVIEW_COURSE_IDS.includes(String(c.id));
+  if (REVIEW_COURSE_IDS.includes(String(c.id))) return true;
+  if (!isSemesterTerm(c.term)) return false;
+  // a course whose own (enforced) dates run past the term still counts
+  if (c.restrict_enrollments_to_course_dates && parse(c.end_at)) {
+    const start = parse(c.term?.start_at ?? null);
+    return !start || start.getTime() - LEAD_DAYS * 86400000 <= now.getTime();
+  }
+  return isCurrentSemester(c.term, now);
 }
 
 export function toTeacherCourse(c: CanvasCourse): TeacherCourse {

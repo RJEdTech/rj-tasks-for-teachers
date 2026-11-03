@@ -28,7 +28,8 @@ The e2e test includes a student named `<img src=x onerror=alert(1)> Test` and ch
 - Student data (names, missing work, submissions) is held in memory while the panel is open and discarded on close, refresh or page change.
 - `chrome.storage.sync` holds settings only: threshold, hide-names, excluded course ids, and button placement.
 - `chrome.storage.local` holds the ids of ignored check-up items, and the teacher's own course ids and names so the settings page can list them.
-- `sessionStorage` on the Canvas origin holds two values for the browser session: whether the user teaches a current class (`1`/`0`), and Canvas's to-grade count.
+- `sessionStorage` on the Canvas origin (this tab only, gone when it closes) holds: whether the user teaches a class this semester (`1`/`0`, re-checked hourly), the To grade total for the badge (5 minutes), and the sidebar card's summary (5 minutes): counts, course codes, assignment titles and ids. **No student names, ids or grades** are ever cached; the card only shows how many students have missing work.
+- The sidebar card sits in Canvas's `#right-side` in its own closed shadow root, built only through `h()`; its links go through `canvasLink()`.
 - No analytics, no remote code, no third-party runtime dependencies, no servers.
 
 ## Extension pages

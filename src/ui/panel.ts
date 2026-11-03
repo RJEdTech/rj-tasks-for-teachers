@@ -35,6 +35,8 @@ export interface PanelOptions {
   loader?: Loader;
   /* where focus goes when the panel closes and the button isn't showing */
   onClosed?: () => void;
+  /* after Refresh, or an Ignore in Check-up: the sidebar card reloads */
+  onDataChanged?: () => void;
 }
 
 export class Panel {
@@ -56,6 +58,8 @@ export class Panel {
   private lastStudents: StudentRow[] = [];
   private renderToken = 0;
   private now: () => Date;
+  /* the all-classes To grade total, whenever the panel works it out */
+  onGradeTotal: ((n: number) => void) | null = null;
 
   constructor(private opts: PanelOptions) {
     this.now = opts.now ?? (() => new Date());
@@ -106,7 +110,7 @@ export class Panel {
     if (n && n > 0) {
       this.badge.textContent = n > 99 ? '99+' : String(n);
       this.badge.hidden = false;
-      this.launcher.setAttribute('aria-label', `My Classes, ${plural(n, 'assignment')} to grade`);
+      this.launcher.setAttribute('aria-label', `My Classes, ${plural(n, 'submission')} to grade`);
     } else {
       this.badge.hidden = true;
       this.launcher.setAttribute('aria-label', 'My Classes');
@@ -194,6 +198,7 @@ export class Panel {
     refresh.addEventListener('click', () => {
       this.loader.reset();
       void this.loadCourses();
+      this.opts.onDataChanged?.();
     });
     const settings = h('button', { class: 'linkbtn', type: 'button' }, 'Settings');
     settings.addEventListener('click', () => this.opts.openSettings());
@@ -296,7 +301,9 @@ export class Panel {
         const r = await this.loader.toGrade(courses);
         content = gradingView(r.value, showCourse, now);
         note = failedNote(r.failed, r.partial);
-        this.setCount('grade', r.value.reduce((s, x) => s + x.count, 0));
+        const total = r.value.reduce((s, x) => s + x.count, 0);
+        this.setCount('grade', total);
+        if (this.scope === 'all' && token === this.renderToken) this.onGradeTotal?.(total);
       } else if (this.tab === 'checkup') {
         const ignored = await loadIgnored();
         const r = await this.loader.checkup(courses, ignored);
@@ -358,6 +365,7 @@ export class Panel {
     set.add(i.key);
     await setIgnored(set).catch(() => undefined);
     this.renderTab();
+    this.opts.onDataChanged?.();
   }
 
   private async unignore(courses: TeacherCourse[]): Promise<void> {
@@ -366,6 +374,7 @@ export class Panel {
     for (const k of [...set]) if (ids.has(k.split(':')[0])) set.delete(k);
     await setIgnored(set).catch(() => undefined);
     this.renderTab();
+    this.opts.onDataChanged?.();
   }
 
   private async copyStudents(): Promise<void> {

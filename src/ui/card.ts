@@ -7,6 +7,11 @@
 
   Student names never appear here: the sidebar is always on screen, so it
   only ever shows counts.
+
+  Canvas load: the summary is kept in this tab's sessionStorage for 5
+  minutes (counts, course codes and assignment titles only), so going back
+  to the Dashboard doesn't ask Canvas for everything again. Sections load one
+  after another, not all at once, and Students (the heaviest) goes last.
 */
 import { canvasLink } from '../lib/canvasApi';
 import { Settings, loadIgnored } from '../lib/settings';
@@ -22,8 +27,92 @@ import type { Tab } from './panel';
 declare const SHADOW_MODE: 'open' | 'closed';
 
 const TOP_ROWS = 3;
+const CACHE_PREFIX = 'rjtt-card-v1:';
+const CACHE_TTL_MS = 5 * 60 * 1000;
 const DAY_LETTER = new Intl.DateTimeFormat('en-US', { weekday: 'narrow' });
 const DAY_NAME = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+const LABELS: Record<Tab, string> = { grade: 'To grade', checkup: 'Check-up', students: 'Students', week: 'Week' };
+
+/* What the card shows. Plain data, so it can be cached as JSON. No student names. */
+export interface GradeSummary {
+  total: number;
+  assignments: number;
+  rows: Array<{ courseId: string; code: string; assignmentId: string; name: string; count: number; oldest: number | null }>;
+}
+export interface CheckupSummary {
+  fix: number;
+  check: number;
+  top: Array<{ code: string; title: string }>;
+}
+export interface StudentsSummary {
+  n: number;
+  periodKnown: boolean;
+}
+export interface WeekSummary {
+  total: number;
+  days: Array<{ at: number; n: number; flagged: boolean }>;
+}
+export interface CardSummary {
+  grade?: GradeSummary | null; // null = couldn't load
+  checkup?: CheckupSummary | null;
+  students?: StudentsSummary | null;
+  week?: WeekSummary | null;
+}
+
+export function summarizeGrade(rows: GradingRow[]): GradeSummary {
+  return {
+    total: rows.reduce((n, r) => n + r.count, 0),
+    assignments: rows.length,
+    rows: rows.slice(0, TOP_ROWS).map((r) => ({
+      courseId: r.course.id,
+      code: r.course.code,
+      assignmentId: r.assignmentId,
+      name: r.name,
+      count: r.count,
+      oldest: r.oldest ? r.oldest.getTime() : null,
+    })),
+  };
+}
+
+export function summarizeWeek(days: WeekDay[]): WeekSummary {
+  return {
+    total: days.reduce((n, d) => n + d.items.length, 0),
+    days: days.map((d) => ({ at: d.date.getTime(), n: d.items.length, flagged: d.flags.length > 0 })),
+  };
+}
+
+function readCache(key: string): CardSummary | null {
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as { t?: unknown; s?: unknown };
+    if (typeof v.t !== 'number' || Date.now() - v.t > CACHE_TTL_MS || !v.s || typeof v.s !== 'object') return null;
+    const s = v.s as CardSummary;
+    // only a complete summary is reused
+    return s.grade && s.checkup && s.students && s.week ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(key: string, s: CardSummary): void {
+  try {
+    window.sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ t: Date.now(), s }));
+  } catch {
+    /* storage full or blocked: just load again next time */
+  }
+}
+
+export function clearCardCache(): void {
+  try {
+    for (let i = window.sessionStorage.length - 1; i >= 0; i--) {
+      const k = window.sessionStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) window.sessionStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 export interface CardOptions {
   loader: Loader;
@@ -31,6 +120,7 @@ export interface CardOptions {
   /* null on the Dashboard (all classes); a course id on that course's home page */
   courseId: string | null;
   onOpen: (tab: Tab) => void;
+  /* the To grade total, for the badge; called only for the latest load */
   onGradeCount?: (n: number) => void;
   now?: () => Date;
 }
@@ -41,6 +131,7 @@ export class SidebarCard {
   private wrap: HTMLElement;
   private sections = new Map<Tab, HTMLElement>();
   private token = 0;
+  private lastTab: Tab | null = null;
   private now: () => Date;
 
   constructor(private opts: CardOptions) {
@@ -61,37 +152,53 @@ export class SidebarCard {
     this.root.appendChild(this.wrap);
   }
 
+  private cacheKey(): string {
+    const s = this.opts.settings;
+    return [
+      this.opts.courseId ?? 'all',
+      s.allClasses ? 'all' : 'sem',
+      s.excludedCourses.slice().sort().join(','),
+      s.missingThreshold,
+    ].join('|');
+  }
+
   updateSettings(s: Settings): void {
     this.opts.settings = s;
     void this.load();
   }
 
+  /* After Refresh or Ignore in the panel: drop the cached summary and reload. */
+  refresh(): void {
+    clearCardCache();
+    void this.load();
+  }
+
+  /* Focus the section heading that opened the panel (for when it closes). */
+  focusLast(): void {
+    const tab = this.lastTab ?? 'grade';
+    const b = this.sections.get(tab)?.querySelector('.sec-head') as HTMLElement | null;
+    (b ?? (this.wrap.querySelector('.open') as HTMLElement | null))?.focus();
+  }
+
+  private open(tab: Tab): void {
+    this.lastTab = tab;
+    this.opts.onOpen(tab);
+  }
+
   async load(): Promise<void> {
     const token = ++this.token;
+    const live = () => token === this.token;
     const scoped = this.opts.courseId !== null;
-    clear(this.wrap);
-    this.sections.clear();
+    const key = this.cacheKey();
+    const summary: CardSummary = {};
 
-    const open = h('button', { class: 'open', type: 'button' }, 'Open');
-    open.addEventListener('click', () => this.opts.onOpen('grade'));
-    this.wrap.append(
-      h(
-        'div',
-        { class: 'head' },
-        h('span', { class: 'mark', 'aria-hidden': 'true' }, 'RJ'),
-        h('h2', { id: 'rjtt-card-title' }, scoped ? 'This class' : 'My Classes'),
-        open
-      )
-    );
-    for (const [tab, label] of [
-      ['grade', 'To grade'],
-      ['checkup', 'Check-up'],
-      ['students', 'Students'],
-      ['week', 'Week'],
-    ] as Array<[Tab, string]>) {
-      const sec = h('div', { class: 'sec', 'data-sec': tab }, this.sectionHead(tab, label, null), h('p', { class: 'muted' }, 'Loading…'));
-      this.sections.set(tab, sec);
-      this.wrap.append(sec);
+    this.buildShell(scoped);
+
+    const cached = readCache(key);
+    if (cached) {
+      this.render(cached, scoped);
+      if (cached.grade) this.opts.onGradeCount?.(cached.grade.total);
+      return;
     }
 
     let courses: TeacherCourse[];
@@ -99,13 +206,12 @@ export class SidebarCard {
       const all = await this.opts.loader.courses(this.opts.settings.excludedCourses, this.opts.settings.allClasses);
       courses = scoped ? all.filter((c) => c.id === this.opts.courseId) : all;
     } catch {
-      if (token !== this.token) return;
-      this.replaceAll("Couldn't reach Canvas. Refresh the page to try again.");
+      if (live()) this.message("Couldn't reach Canvas. Refresh the page to try again.");
       return;
     }
-    if (token !== this.token) return;
+    if (!live()) return;
     if (!courses.length) {
-      this.replaceAll(
+      this.message(
         scoped
           ? 'This class is turned off in RJ Tasks settings.'
           : 'No classes this semester. Classes you turned off in Settings are left out.'
@@ -115,59 +221,84 @@ export class SidebarCard {
 
     const L = this.opts.loader;
     const s = this.opts.settings;
-    const now = this.now();
-    void L.toGrade(courses)
-      .then((r) => {
-        if (token !== this.token) return;
-        const total = r.value.reduce((n, x) => n + x.count, 0);
-        this.opts.onGradeCount?.(total);
-        this.fill('grade', total, this.gradeBody(r.value, total, !scoped, now));
-      })
-      .catch(() => this.fill('grade', null, this.failed()));
-    void loadIgnored()
-      .then((ignored) => L.checkup(courses, ignored))
-      .then((r) => {
-        if (token !== this.token) return;
-        const fix = r.value.filter((i) => i.severity === 'fix');
-        const check = r.value.length - fix.length;
-        const body = h('div');
-        if (!r.value.length) body.append(h('p', { class: 'muted' }, 'No setup problems found.'));
-        else {
-          body.append(
-            h('p', { class: 'line' }, [fix.length ? `${fix.length} to fix` : '', check ? `${check} worth a look` : ''].filter(Boolean).join(' · '))
-          );
-          for (const i of fix.slice(0, 2))
-            body.append(h('p', { class: 'small' }, !scoped ? `${i.course.code}: ` : '', i.title));
-        }
-        this.fill('checkup', fix.length, body);
-      })
-      .catch(() => this.fill('checkup', null, this.failed()));
-    void L.students(courses, s.missingThreshold)
-      .then((r) => {
-        if (token !== this.token) return;
-        const n = r.value.length;
-        const when = r.periodKnown ? 'this grading period' : 'so far';
-        const body = h(
-          'p',
-          { class: n ? 'line' : 'muted' },
-          n
-            ? `${plural(n, 'student')} with ${s.missingThreshold}+ missing ${when}`
-            : `No students with ${s.missingThreshold}+ missing ${when}.`
-        );
-        this.fill('students', n, body);
-      })
-      .catch(() => this.fill('students', null, this.failed()));
-    void L.week(courses)
-      .then((r) => {
-        if (token !== this.token) return;
-        const total = r.value.reduce((n, d) => n + d.items.length, 0);
-        this.fill('week', total, this.weekStrip(r.value, total));
-      })
-      .catch(() => this.fill('week', null, this.failed()));
+
+    // One section at a time, cheapest and most-used first; Students last.
+    try {
+      const r = await L.toGrade(courses);
+      summary.grade = summarizeGrade(r.value);
+      if (live()) this.opts.onGradeCount?.(summary.grade.total);
+    } catch {
+      summary.grade = null;
+    }
+    if (!live()) return;
+    this.render(summary, scoped);
+
+    try {
+      const r = await L.week(courses);
+      summary.week = summarizeWeek(r.value);
+    } catch {
+      summary.week = null;
+    }
+    if (!live()) return;
+    this.render(summary, scoped);
+
+    try {
+      const r = await L.checkup(courses, await loadIgnored());
+      const fix = r.value.filter((i) => i.severity === 'fix');
+      summary.checkup = {
+        fix: fix.length,
+        check: r.value.length - fix.length,
+        top: fix.slice(0, 2).map((i) => ({ code: i.course.code, title: i.title })),
+      };
+    } catch {
+      summary.checkup = null;
+    }
+    if (!live()) return;
+    this.render(summary, scoped);
+
+    try {
+      const r = await L.students(courses, s.missingThreshold);
+      summary.students = { n: r.value.length, periodKnown: r.periodKnown };
+    } catch {
+      summary.students = null;
+    }
+    if (!live()) return;
+    this.render(summary, scoped);
+    if (summary.grade && summary.week && summary.checkup && summary.students) writeCache(key, summary);
+  }
+
+  private buildShell(scoped: boolean): void {
+    clear(this.wrap);
+    this.sections.clear();
+    const open = h('button', { class: 'open', type: 'button' }, 'Open');
+    open.addEventListener('click', () => this.open('grade'));
+    this.wrap.append(
+      h(
+        'div',
+        { class: 'head' },
+        h('span', { class: 'mark', 'aria-hidden': 'true' }, 'RJ'),
+        h('h2', { id: 'rjtt-card-title' }, scoped ? 'This class' : 'My Classes'),
+        open
+      )
+    );
+    for (const tab of ['grade', 'checkup', 'students', 'week'] as Tab[]) {
+      const sec = h('div', { class: 'sec', 'data-sec': tab }, this.sectionHead(tab, null), h('p', { class: 'muted' }, 'Loading…'));
+      this.sections.set(tab, sec);
+      this.wrap.append(sec);
+    }
+  }
+
+  private message(msg: string): void {
+    const head = this.wrap.firstChild;
+    clear(this.wrap);
+    this.sections.clear();
+    if (head) this.wrap.append(head);
+    this.wrap.append(h('p', { class: 'muted pad' }, msg));
   }
 
   /* The whole heading is a button that opens the full panel at that view. */
-  private sectionHead(tab: Tab, label: string, n: number | null): HTMLElement {
+  private sectionHead(tab: Tab, n: number | null): HTMLElement {
+    const label = LABELS[tab];
     const b = h(
       'button',
       { class: 'sec-head', type: 'button', 'aria-label': `${label}${n ? `, ${n}` : ''}: open in the full view` },
@@ -175,87 +306,112 @@ export class SidebarCard {
       n ? h('span', { class: tab === 'checkup' || tab === 'grade' ? 'pill red' : 'pill' }, n > 99 ? '99+' : String(n)) : null,
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')
     );
-    b.addEventListener('click', () => this.opts.onOpen(tab));
+    b.addEventListener('click', () => this.open(tab));
     return b;
+  }
+
+  /* Fill whichever sections have data; leave the rest saying Loading. Keeps
+     keyboard focus on the same section heading if it was there. */
+  private render(s: CardSummary, scoped: boolean): void {
+    const focused = this.root.activeElement?.closest('.sec')?.getAttribute('data-sec') as Tab | undefined;
+    const now = this.now();
+    if (s.grade !== undefined) this.fill('grade', s.grade ? s.grade.total : null, s.grade ? this.gradeBody(s.grade, !scoped, now) : this.failed());
+    if (s.checkup !== undefined) this.fill('checkup', s.checkup ? s.checkup.fix : null, s.checkup ? this.checkupBody(s.checkup, !scoped) : this.failed());
+    if (s.students !== undefined) this.fill('students', s.students ? s.students.n : null, s.students ? this.studentsBody(s.students) : this.failed());
+    if (s.week !== undefined) this.fill('week', null, s.week ? this.weekStrip(s.week) : this.failed());
+    if (focused) (this.sections.get(focused)?.querySelector('.sec-head') as HTMLElement | null)?.focus();
   }
 
   private fill(tab: Tab, n: number | null, body: HTMLElement): void {
     const sec = this.sections.get(tab);
     if (!sec) return;
-    const label = { grade: 'To grade', checkup: 'Check-up', students: 'Students', week: 'Week' }[tab];
     clear(sec);
-    append(sec, this.sectionHead(tab, label, tab === 'week' ? null : n), body);
-  }
-
-  private replaceAll(msg: string): void {
-    const head = this.wrap.firstChild;
-    clear(this.wrap);
-    if (head) this.wrap.append(head);
-    this.wrap.append(h('p', { class: 'muted pad' }, msg));
+    append(sec, this.sectionHead(tab, n), body);
   }
 
   private failed(): HTMLElement {
     return h('p', { class: 'muted' }, "Couldn't load. Refresh the page to try again.");
   }
 
-  private gradeBody(rows: GradingRow[], total: number, showCourse: boolean, now: Date): HTMLElement {
+  private gradeBody(g: GradeSummary, showCourse: boolean, now: Date): HTMLElement {
     const box = h('div');
-    if (!rows.length) {
+    if (!g.rows.length) {
       box.append(h('p', { class: 'muted' }, 'Nothing waiting. Nice.'));
       return box;
     }
     const list = h('ul', { class: 'list' });
-    for (const r of rows.slice(0, TOP_ROWS)) {
-      const href = canvasLink('/courses/:c/gradebook/speed_grader?assignment_id=:a', { c: r.course.id, a: r.assignmentId });
+    for (const r of g.rows) {
+      const href = canvasLink('/courses/:c/gradebook/speed_grader?assignment_id=:a', { c: r.courseId, a: r.assignmentId });
       list.append(
         h(
           'li',
           {},
-          showCourse ? h('span', { class: 'code' }, r.course.code) : null,
+          showCourse ? h('span', { class: 'code' }, r.code) : null,
           h('a', { href }, r.name),
-          h('span', { class: 'small' }, `${r.count} to grade${r.oldest ? ` · waiting ${waitingFor(r.oldest, now)}` : ''}`)
+          h('span', { class: 'small' }, `${r.count} to grade${r.oldest ? ` · waiting ${waitingFor(new Date(r.oldest), now)}` : ''}`)
         )
       );
     }
     box.append(list);
-    if (rows.length > TOP_ROWS) {
-      const more = h('button', { class: 'more', type: 'button' }, `${plural(rows.length - TOP_ROWS, 'more assignment')} (${plural(total, 'submission')} in all)`);
-      more.addEventListener('click', () => this.opts.onOpen('grade'));
+    if (g.assignments > g.rows.length) {
+      const more = h('button', { class: 'more', type: 'button' }, `${plural(g.assignments - g.rows.length, 'more assignment')} (${plural(g.total, 'submission')} in all)`);
+      more.addEventListener('click', () => this.open('grade'));
       box.append(more);
     }
     return box;
   }
 
-  private weekStrip(days: WeekDay[], total: number): HTMLElement {
+  private checkupBody(c: CheckupSummary, showCourse: boolean): HTMLElement {
+    const body = h('div');
+    if (!c.fix && !c.check) {
+      body.append(h('p', { class: 'muted' }, 'No setup problems found.'));
+      return body;
+    }
+    body.append(h('p', { class: 'line' }, [c.fix ? `${c.fix} to fix` : '', c.check ? `${c.check} worth a look` : ''].filter(Boolean).join(' · ')));
+    for (const i of c.top) body.append(h('p', { class: 'small' }, showCourse ? `${i.code}: ` : '', i.title));
+    return body;
+  }
+
+  private studentsBody(st: StudentsSummary): HTMLElement {
+    const t = this.opts.settings.missingThreshold;
+    const when = st.periodKnown ? 'this grading period' : 'so far';
+    return h(
+      'p',
+      { class: st.n ? 'line' : 'muted' },
+      st.n ? `${plural(st.n, 'student')} with ${t}+ missing ${when}` : `No students with ${t}+ missing ${when}.`
+    );
+  }
+
+  private weekStrip(w: WeekSummary): HTMLElement {
     const box = h('div');
     const strip = h('ol', { class: 'strip', 'aria-label': 'Items due each of the next 7 days' });
-    days.forEach((d, i) => {
-      const name = i === 0 ? 'Today' : DAY_NAME.format(d.date);
-      const flagged = d.flags.length > 0;
+    w.days.forEach((d, i) => {
+      const date = new Date(d.at);
+      const name = i === 0 ? 'Today' : DAY_NAME.format(date);
       strip.append(
         h(
           'li',
           {
-            class: flagged ? 'flag' : d.items.length ? 'some' : '',
-            title: `${name}: ${plural(d.items.length, 'item')}${flagged ? ', 2+ graded items for one class' : ''}`,
+            class: d.flagged ? 'flag' : d.n ? 'some' : '',
+            title: `${name}: ${plural(d.n, 'item')}${d.flagged ? ', 2+ graded items for one class' : ''}`,
           },
-          h('span', { class: 'd' }, i === 0 ? 'Today' : DAY_LETTER.format(d.date)),
-          h('span', { class: 'n' }, String(d.items.length)),
-          h('span', { class: 'sr' }, ` ${name}, ${plural(d.items.length, 'item')}${flagged ? ', heavy day' : ''}`)
+          h('span', { class: 'd', 'aria-hidden': 'true' }, i === 0 ? 'Today' : DAY_LETTER.format(date)),
+          h('span', { class: 'n', 'aria-hidden': 'true' }, String(d.n)),
+          h('span', { class: 'sr' }, `${name}, ${plural(d.n, 'item')}${d.flagged ? ', heavy day' : ''}`)
         )
       );
     });
     box.append(strip);
-    const heavy = days.filter((d) => d.flags.length).length;
-    box.append(
-      h('p', { class: 'small' }, `${plural(total, 'item')} due in the next 7 days${heavy ? ` · ${plural(heavy, 'heavy day')}` : ''}`)
-    );
+    const heavy = w.days.filter((d) => d.flagged).length;
+    box.append(h('p', { class: 'small' }, `${plural(w.total, 'item')} due in the next 7 days${heavy ? ` · ${plural(heavy, 'heavy day')}` : ''}`));
     return box;
   }
 }
 
 /* Where the card goes. Dashboard: top of the right sidebar, above To Do.
-   Course home: under the teacher buttons (Import, Choose Home Page...). */
+   Course home: under the teacher buttons (Import, Choose Home Page...).
+   Canvas fills the Dashboard sidebar after the page loads, so the caller
+   re-runs this when #right-side changes. */
 export function cardSlot(doc: Document, kind: 'dashboard' | 'course'): { parent: Element; before: Node | null } | null {
   const side = doc.querySelector('#right-side');
   if (!side) return null;
@@ -271,7 +427,13 @@ export function cardSlot(doc: Document, kind: 'dashboard' | 'course'): { parent:
   return { parent: side, before: side.firstChild };
 }
 
+/* Is the card where it belongs? */
+export function inSlot(host: Element, slot: { parent: Element; before: Node | null }): boolean {
+  return host.parentElement === slot.parent && (slot.before === host || host.nextSibling === slot.before);
+}
+
 export function isShown(el: Element): boolean {
+  if (!el.isConnected) return false;
   const r = el.getBoundingClientRect();
   return el.getClientRects().length > 0 && r.width > 0 && r.height > 0;
 }

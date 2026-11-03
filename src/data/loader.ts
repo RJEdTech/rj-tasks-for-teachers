@@ -222,13 +222,6 @@ export class Loader {
     return { value: rows.flat(), failed, partial, periodKnown };
   }
 
-  /* The badge number: the same count the To grade view shows, so the two
-     always agree (active students only, this semester's classes only). */
-  async gradeCount(courses: TeacherCourse[]): Promise<number> {
-    const r = await this.toGrade(courses);
-    return r.value.reduce((s, x) => s + x.count, 0);
-  }
-
   async week(courses: TeacherCourse[]): Promise<Loaded<WeekDay[]>> {
     const failed: TeacherCourse[] = [];
     const data = await mapLimit(courses, PARALLEL, async (c) => {
