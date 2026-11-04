@@ -41,6 +41,7 @@ def assignments_for(cid):
         "assignment_group_id": kw.get("group", "g1"), "submission_types": ["online_upload"],
         "omit_from_final_grade": False, "needs_grading_count": kw.get("ngc", 0),
         "html_url": f"https://rjhs.instructure.com/courses/{cid}/assignments/{i}",
+        **({"rubric_settings": {"points_possible": kw["rubric"]}, "use_rubric_for_grading": True} if "rubric" in kw else {}),
     }
     if cid == "101":  # ALGEBRA 1, weighted
         return [
@@ -49,7 +50,7 @@ def assignments_for(cid):
             A(1003, "HW 2.5 Quadratics", day(-6)),
             A(1004, "HW 2.6 Review", day(-2)),
             A(1005, "Unit 3 Quiz", day(1, 8, 0), points=30, group="g2"),
-            A(1006, "HW 3.1", day(1)),
+            A(1006, "HW 3.1", day(1), rubric=8),  # rubric totals 8, assignment worth 10
             A(1007, "Exit ticket", day(2), group="g3"),  # 0% group
             A(1008, "Project proposal", None),  # no due date
             A(1009, "Unit 3 Test", day(2), published=False, points=100, group="g2"),  # unpublished, due soon
@@ -61,7 +62,7 @@ def assignments_for(cid):
                 {"title": "1 student", "set_type": "ADHOC", "set_id": None, "due_at": day(1)},
             ]),
         ]
-    if cid == "102":  # GEOMETRY, unweighted, section dates
+    if cid == "102":  # GEOMETRY, unweighted, section dates (+ a copied duplicate)
         return [
             A(2001, "Proofs worksheet", day(-4)),
             A(2002, "Lab: Triangles", day(3), lock_at=day(3, 15, 0)),  # locks before due
@@ -73,6 +74,7 @@ def assignments_for(cid):
                 {"base": False, "title": "Period 3", "set_type": "CourseSection", "set_id": "s3", "due_at": day(4)},
             ]),
             A(2005, "Reading notes", day(-1), gt="not_graded", points=None),
+            A(2006, "proofs  worksheet", day(9)),  # same name as 2001
         ]
     if cid == "103":  # ADVISEMENT
         return [A(3001, "Advisement check-in", day(6), gt="not_graded", points=None)]
@@ -89,6 +91,24 @@ GROUPS = {
 
 NAMES = ["Avery Cole", "Blake Diaz", "Casey Ellis", "Devon Ford", "Emery Grant", "Finley Hayes",
          "Gray Ito", "Harper Jones", "<img src=x onerror=alert(1)> Test", "Jordan Kim"]
+
+
+def modules_for(cid):
+    """101: everything but the project proposal is in a module. 102: one big
+    module whose items Canvas leaves out (fetched separately). 103: none."""
+    if cid == "101":
+        ids = [a["id"] for a in assignments_for("101") if a["id"] != "1008"]
+        return [{"id": "m1", "name": "Unit 2-3", "published": True,
+                 "items": [{"id": f"i{x}", "type": "Assignment", "content_id": x, "published": True} for x in ids]}]
+    if cid == "102":
+        return [{"id": "m2", "name": "Chapter 4", "published": True, "items_count": 99}]
+    return []
+
+
+def module_items_for(cid, mid):
+    if cid == "102" and mid == "m2":
+        return [{"id": f"j{a['id']}", "type": "Assignment", "content_id": a["id"], "published": True} for a in assignments_for("102")]
+    return []
 
 
 def users_for(cid):
@@ -267,6 +287,14 @@ class Handler(BaseHTTPRequestHandler):
             cid, rest = parts[4], "/".join(parts[5:])
             if rest == "assignments":
                 return self.json(assignments_for(cid))
+            if rest == "modules":
+                return self.json(modules_for(cid))
+            if rest.startswith("modules/") and rest.endswith("/items"):
+                return self.json(module_items_for(cid, rest.split("/")[1]))
+            if rest == "late_policy":
+                if cid == "103":
+                    return self.send(404, "application/json", "while(1);" + json.dumps({"errors": [{"message": "not found"}]}))
+                return self.json({"late_policy": {"missing_submission_deduction_enabled": cid == "101", "late_submission_deduction_enabled": False}})
             if rest == "assignment_groups":
                 return self.json(GROUPS.get(cid, []))
             if rest == "users":

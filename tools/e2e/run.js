@@ -110,7 +110,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Dashboard: after Canvas fills its sidebar, the card is back in it, above To Do', placement === 'right-side|todo-list-header', placement);
   check('Dashboard card: To grade count and oldest-first rows', /To grade\s*15/.test(ct) && (await $c('.list li').count()) === 3, ct.slice(0, 160));
   check('Dashboard card: rows link to SpeedGrader', (await $c('.list a').first().getAttribute('href')) === `${BASE}/courses/101/gradebook/speed_grader?assignment_id=1001`);
-  check('Dashboard card: Check-up summary', /4 to fix · 3 worth a look/.test(ct), ct);
+  check('Dashboard card: Check-up summary', /\d+ to fix · \d+ worth a look/.test(ct), ct);
+  check('Dashboard card: "Questions?" links to the Canvas PD course', (await $c('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
   check('Dashboard card: Students as a count only, never names', /3 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|img/.test(ct), ct);
   check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /items? due in the next 7 days/.test(ct));
   check('Dashboard card: only this semester\'s classes', !/EDTECH|RAIDERQUEST|DEMO|THEOLOGY 1 S2/.test(ct));
@@ -168,13 +169,36 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   t = await waitBody(/to fix|No setup/);
   const rules = await $('.body .row').evaluateAll((els) => els.map((e) => e.getAttribute('data-rule')));
   check(
-    'Check-up: finds each kind of setup problem',
-    ['weights_total', 'no_due_date', 'unpublished_due', 'locks_before_due', 'zero_weight_group', 'zero_points', 'midnight_due'].every((r) =>
-      rules.includes(r)
-    ) && rules.length === 7,
+    'Check-up: finds each kind of setup problem (1.0 rules)',
+    ['weights_total', 'no_due_date', 'unpublished_due', 'locks_before_due', 'zero_weight_group', 'zero_points', 'midnight_due'].every((r) => rules.includes(r)),
     rules.join(',')
   );
-  check('Check-up: fixes listed before checks', /4 to fix, 3 worth a look/.test(t), t.slice(0, 60));
+  check(
+    'Check-up: RJ Baseline and new 1.1 checks',
+    ['not_in_module', 'missing_policy', 'grading_waiting', 'rubric_points', 'duplicate_name'].every((r) => rules.includes(r)),
+    rules.join(',')
+  );
+  const sev = await $('.body .row[data-rule]').evaluateAll((els) => els.map((e) => (e.classList.contains('fix') ? 'f' : 'c')).join(''));
+  check('Check-up: fixes listed before checks', /^f+c+$/.test(sev) && /\d+ to fix, \d+ worth a look/.test(t), sev);
+  const modRow = page.locator(`${host} >> css=.body .row[data-rule="not_in_module"]`, { hasText: 'ALGEBRA' });
+  check(
+    'Check-up: Baseline 1 names the loose assignment and links to Modules',
+    /1 assignment not in Modules/.test(await modRow.textContent()) && /Project proposal/.test(await modRow.textContent()) &&
+      (await modRow.locator('a').first().getAttribute('href')) === `${BASE}/courses/101/modules`
+  );
+  const mp = page.locator(`${host} >> css=.body .row[data-rule="missing_policy"]`, { hasText: 'GEOMETRY' });
+  check(
+    'Check-up: Baseline 2 (GEOMETRY missing policy off) links to the Gradebook and the PD how-to',
+    (await mp.count()) === 1 &&
+      (await page.locator(`${host} >> css=.body .row[data-rule="missing_policy"]`, { hasText: 'ALGEBRA' }).count()) === 0 &&
+      (await mp.locator('a', { hasText: 'How to' }).getAttribute('href')) === `${BASE}/courses/5414/pages/setting-up-our-automatic-missing-slash-late-policy-in-canvas`
+  );
+  check(
+    'Check-up: modules too big to list inline are fetched (GEOMETRY not flagged; ADVISEMENT with no modules is)',
+    (await page.locator(`${host} >> css=.body .row[data-rule="not_in_module"]`, { hasText: 'GEOMETRY' }).count()) === 0 &&
+      (await page.locator(`${host} >> css=.body .row[data-rule="not_in_module"]`, { hasText: 'ADVISEMENT' }).count()) === 1
+  );
+  check('panel footer: "Questions?" links to the Canvas PD course', (await $('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
   check('Check-up: midnight wording names both nights', /12:00 AM on .*which is the end of/.test(t));
   const editHref = await $('.body .row[data-rule="no_due_date"] a').getAttribute('href');
   check('Check-up: links to the assignment edit page', editHref === `${BASE}/courses/101/assignments/1008/edit`, editHref);
@@ -236,6 +260,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Week: unpublished and ungraded items do not add to flags', !/Unit 3 Test/.test(t));
   check('Week: a one-student extension is labeled and not counted', /Essay draft\s*1 student/.test(t) && !/ALGEBRA 1: 3 graded/.test(t));
   check('Week: says it only covers your classes', /Canvas doesn't let teachers see/.test(t));
+  check('Week: grading-coming-in chart for 14 days', (await $('.body .fc .col').count()) === 14 && /About \d+ submissions due from students in the next 14 days/.test(t) && /Waiting now: 15/.test(t), t.slice(0, 160));
+  await $('.body .fc').screenshot({ path: path.join(OUT, '4c-grading-coming.png') });
   await page.screenshot({ path: path.join(OUT, '4-week.png') });
 
   // ---------- course home: card for that class ----------
@@ -298,6 +324,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await opt.waitForSelector('#classes label');
   const classLabels = await opt.locator('#classes label').allTextContents();
   check('settings: lists your classes', classLabels.length === 3, classLabels.join(' | '));
+  check('settings: jump links to each section', (await opt.locator('nav.jump a').count()) === 6);
+  check('settings: every Check-up check has its own switch', (await opt.locator('#checks input[type=checkbox]').count()) === 19);
   await opt.locator('#classes label', { hasText: 'ADVISEMENT' }).locator('input').uncheck();
   await opt.waitForSelector('#saved:has-text("Saved")');
   await opt.screenshot({ path: path.join(OUT, '6-settings.png'), fullPage: true });
@@ -320,6 +348,49 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('settings: "Only this semester" off brings back PD and other courses', wide[0] === 'All my classes (6)' && wide.some((o) => /EDTECH/.test(o)), wide.join(' | '));
   await opt.locator('#semesterOnly').check();
   await opt.waitForSelector('#saved:has-text("Saved")');
+
+  // ---------- 1.1: order, card sections, check switches, Hide ----------
+  await opt.bringToFront();
+  await opt.locator('[data-move="week-up"]').click();
+  await opt.locator('[data-move="week-up"]').click();
+  await opt.locator('[data-move="week-up"]').click();
+  const focusedMove = await opt.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-move'));
+  await opt.locator('#order input[data-sec="checkup"]').uncheck();
+  await opt.locator('#checks input[data-rule="duplicate_name"]').uncheck();
+  await opt.waitForSelector('#saved:has-text("Saved")');
+  await opt.screenshot({ path: path.join(OUT, '6b-settings-order.png'), fullPage: true });
+  check('settings: arrows keep keyboard focus while moving', focusedMove === 'week-down', focusedMove);
+  await page.bringToFront();
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator(C).waitFor();
+  ct = await waitCard();
+  const secs = await $c('.sec').evaluateAll((els) => els.map((e) => e.getAttribute('data-sec')).join(','));
+  check('card: follows the chosen order, without the section turned off', secs === 'week,grade,students', secs);
+  await $c('.open').click();
+  const tabsNow = await $('.tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')).join(','));
+  check('panel: tabs follow the same order and keep every view', tabsNow === 'week,grade,checkup,students', tabsNow);
+  await tab('checkup');
+  await waitBody(/to fix|No setup/);
+  check('a check turned off in Settings is left out', (await $('.body .row[data-rule="duplicate_name"]').count()) === 0);
+  await page.keyboard.press('Escape');
+
+  await $c('.hide').click();
+  await sleep(300);
+  check('card Hide: only the title bar stays', (await $c('.sec').count()) === 0 && (await $c('.hide').textContent()) === 'Show');
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator(C).waitFor();
+  await sleep(500);
+  check('card Hide is remembered', (await $c('.sec').count()) === 0);
+  await $c('.hide').click();
+  await waitCard();
+  check('card Show brings it back', (await $c('.sec').count()) === 3);
+
+  await opt.bringToFront();
+  await opt.locator('#reset-order').click();
+  await opt.locator('#order input[data-sec="checkup"]').check();
+  await opt.locator('#checks-all').click();
+  await opt.waitForSelector('#saved:has-text("Saved")');
+  await page.bringToFront();
 
   const pop = await ctx.newPage();
   watch(pop);

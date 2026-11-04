@@ -14,7 +14,8 @@
   after another, not all at once, and Students (the heaviest) goes last.
 */
 import { canvasLink } from '../lib/canvasApi';
-import { Settings, loadIgnored } from '../lib/settings';
+import { PD_COURSE_PATH } from '../lib/constants';
+import { Settings, loadIgnored, saveSettings } from '../lib/settings';
 import { TeacherCourse } from '../lib/types';
 import { Loader } from '../data/loader';
 import { GradingRow } from '../data/grading';
@@ -32,6 +33,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const DAY_LETTER = new Intl.DateTimeFormat('en-US', { weekday: 'narrow' });
 const DAY_NAME = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 const LABELS: Record<Tab, string> = { grade: 'To grade', checkup: 'Check-up', students: 'Students', week: 'Week' };
+const SUMMARY_KEY = { grade: 'grade', checkup: 'checkup', students: 'students', week: 'week' } as const;
 
 /* What the card shows. Plain data, so it can be cached as JSON. No student names. */
 export interface GradeSummary {
@@ -81,7 +83,7 @@ export function summarizeWeek(days: WeekDay[]): WeekSummary {
   };
 }
 
-function readCache(key: string): CardSummary | null {
+function readCache(key: string, want: Tab[]): CardSummary | null {
   try {
     const raw = window.sessionStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
@@ -89,7 +91,7 @@ function readCache(key: string): CardSummary | null {
     if (typeof v.t !== 'number' || Date.now() - v.t > CACHE_TTL_MS || !v.s || typeof v.s !== 'object') return null;
     const s = v.s as CardSummary;
     // only a complete summary is reused
-    return s.grade && s.checkup && s.students && s.week ? s : null;
+    return want.every((t) => !!s[SUMMARY_KEY[t]]) ? s : null;
   } catch {
     return null;
   }
@@ -159,6 +161,8 @@ export class SidebarCard {
       s.allClasses ? 'all' : 'sem',
       s.excludedCourses.slice().sort().join(','),
       s.missingThreshold,
+      s.cardHidden.join(','),
+      s.checksOff.slice().sort().join(','),
     ].join('|');
   }
 
@@ -175,7 +179,7 @@ export class SidebarCard {
 
   /* Focus the section heading that opened the panel (for when it closes). */
   focusLast(): void {
-    const tab = this.lastTab ?? 'grade';
+    const tab = this.lastTab ?? this.shown()[0] ?? 'grade';
     const b = this.sections.get(tab)?.querySelector('.sec-head') as HTMLElement | null;
     (b ?? (this.wrap.querySelector('.open') as HTMLElement | null))?.focus();
   }
@@ -191,10 +195,16 @@ export class SidebarCard {
     const scoped = this.opts.courseId !== null;
     const key = this.cacheKey();
     const summary: CardSummary = {};
+    const want = this.shown();
 
-    this.buildShell(scoped);
+    this.buildShell(scoped, this.opts.settings.cardCollapsed ? [] : want);
+    if (this.opts.settings.cardCollapsed) return; // hidden: header only, nothing loaded
+    if (!want.length) {
+      this.message('All sections are turned off in RJ Tasks settings. Click Open for the full view.');
+      return;
+    }
 
-    const cached = readCache(key);
+    const cached = readCache(key, want);
     if (cached) {
       this.render(cached, scoped);
       if (cached.grade) this.opts.onGradeCount?.(cached.grade.total);
@@ -222,74 +232,96 @@ export class SidebarCard {
     const L = this.opts.loader;
     const s = this.opts.settings;
 
-    // One section at a time, cheapest and most-used first; Students last.
-    try {
-      const r = await L.toGrade(courses);
-      summary.grade = summarizeGrade(r.value);
-      if (live()) this.opts.onGradeCount?.(summary.grade.total);
-    } catch {
-      summary.grade = null;
+    // One section at a time (not all at once), cheapest first; Students last.
+    // Sections turned off in Settings aren't loaded at all.
+    const steps: Array<[Tab, () => Promise<void>]> = [
+      ['grade', async () => {
+        const r = await L.toGrade(courses);
+        summary.grade = summarizeGrade(r.value);
+        if (live()) this.opts.onGradeCount?.(summary.grade.total);
+      }],
+      ['week', async () => {
+        const r = await L.week(courses);
+        summary.week = summarizeWeek(r.value);
+      }],
+      ['checkup', async () => {
+        const r = await L.checkup(courses, await loadIgnored(), s.checksOff);
+        const fix = r.value.filter((i) => i.severity === 'fix');
+        summary.checkup = {
+          fix: fix.length,
+          check: r.value.length - fix.length,
+          top: fix.slice(0, 2).map((i) => ({ code: i.course.code, title: i.title })),
+        };
+      }],
+      ['students', async () => {
+        const r = await L.students(courses, s.missingThreshold);
+        summary.students = { n: r.value.length, periodKnown: r.periodKnown };
+      }],
+    ];
+    for (const [tab, run] of steps) {
+      if (!want.includes(tab)) continue;
+      try {
+        await run();
+      } catch {
+        summary[SUMMARY_KEY[tab]] = null;
+      }
+      if (!live()) return;
+      this.render(summary, scoped);
     }
-    if (!live()) return;
-    this.render(summary, scoped);
-
-    try {
-      const r = await L.week(courses);
-      summary.week = summarizeWeek(r.value);
-    } catch {
-      summary.week = null;
-    }
-    if (!live()) return;
-    this.render(summary, scoped);
-
-    try {
-      const r = await L.checkup(courses, await loadIgnored());
-      const fix = r.value.filter((i) => i.severity === 'fix');
-      summary.checkup = {
-        fix: fix.length,
-        check: r.value.length - fix.length,
-        top: fix.slice(0, 2).map((i) => ({ code: i.course.code, title: i.title })),
-      };
-    } catch {
-      summary.checkup = null;
-    }
-    if (!live()) return;
-    this.render(summary, scoped);
-
-    try {
-      const r = await L.students(courses, s.missingThreshold);
-      summary.students = { n: r.value.length, periodKnown: r.periodKnown };
-    } catch {
-      summary.students = null;
-    }
-    if (!live()) return;
-    this.render(summary, scoped);
-    if (summary.grade && summary.week && summary.checkup && summary.students) writeCache(key, summary);
+    if (want.every((t) => !!summary[SUMMARY_KEY[t]])) writeCache(key, summary);
   }
 
-  private buildShell(scoped: boolean): void {
+  /* Visible sections, in the order chosen in Settings. */
+  private shown(): Tab[] {
+    const s = this.opts.settings;
+    return s.sectionOrder.filter((t) => !s.cardHidden.includes(t));
+  }
+
+  private buildShell(scoped: boolean, want: Tab[]): void {
     clear(this.wrap);
     this.sections.clear();
     const open = h('button', { class: 'open', type: 'button' }, 'Open');
-    open.addEventListener('click', () => this.open('grade'));
+    open.addEventListener('click', () => this.open(this.shown()[0] ?? this.opts.settings.sectionOrder[0]));
+    const collapsed = this.opts.settings.cardCollapsed;
+    const hide = h(
+      'button',
+      { class: 'hide', type: 'button', 'aria-expanded': String(!collapsed), 'aria-label': collapsed ? 'Show the My Classes summary' : 'Hide the My Classes summary' },
+      collapsed ? 'Show' : 'Hide'
+    );
+    hide.addEventListener('click', () => {
+      const next = { ...this.opts.settings, cardCollapsed: !collapsed };
+      this.opts.settings = next;
+      void this.load().then(() => (this.wrap.querySelector('.hide') as HTMLElement | null)?.focus());
+      void saveSettings(next).catch(() => undefined); // every open Canvas tab follows
+    });
     this.wrap.append(
       h(
         'div',
         { class: 'head' },
         h('span', { class: 'mark', 'aria-hidden': 'true' }, 'RJ'),
         h('h2', { id: 'rjtt-card-title' }, scoped ? 'This class' : 'My Classes'),
+        hide,
         open
       )
     );
-    for (const tab of ['grade', 'checkup', 'students', 'week'] as Tab[]) {
+    for (const tab of want) {
       const sec = h('div', { class: 'sec', 'data-sec': tab }, this.sectionHead(tab, null), h('p', { class: 'muted' }, 'Loading…'));
       this.sections.set(tab, sec);
       this.wrap.append(sec);
     }
+    if (want.length)
+      this.wrap.append(
+        h(
+          'p',
+          { class: 'foot' },
+          'Questions? ',
+          h('a', { href: canvasLink(PD_COURSE_PATH, {}), target: '_blank', rel: 'noopener' }, 'Canvas PD course')
+        )
+      );
   }
 
   private message(msg: string): void {
-    const head = this.wrap.firstChild;
+    const head = this.wrap.querySelector('.head');
     clear(this.wrap);
     this.sections.clear();
     if (head) this.wrap.append(head);

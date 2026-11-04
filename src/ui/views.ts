@@ -1,10 +1,11 @@
 /* Renders each tab's content from already-loaded data. No network here. */
 import { canvasLink } from '../lib/canvasApi';
+import { PD_HELP } from '../lib/constants';
 import { formatDay, formatDayTime, waitingFor, daysBetween } from '../lib/dates';
 import { GradingRow } from '../data/grading';
 import { Issue } from '../data/checkup';
 import { StudentRow } from '../data/students';
-import { WeekDay } from '../data/week';
+import { ForecastDay, WeekDay } from '../data/week';
 import { TeacherCourse } from '../lib/types';
 import { h, plural } from './dom';
 
@@ -62,10 +63,19 @@ export function gradingView(rows: GradingRow[], showCourse: boolean, now: Date):
 /* ---------------- Check-up ---------------- */
 
 export function issueHref(i: Issue): string {
-  return i.link.kind === 'assignment_edit'
-    ? canvasLink('/courses/:c/assignments/:a/edit', { c: i.course.id, a: i.link.assignmentId })
-    : canvasLink('/courses/:c/assignments', { c: i.course.id });
+  switch (i.link.kind) {
+    case 'assignment_edit':
+      return canvasLink('/courses/:c/assignments/:a/edit', { c: i.course.id, a: i.link.assignmentId });
+    case 'modules':
+      return canvasLink('/courses/:c/modules', { c: i.course.id });
+    case 'gradebook':
+      return canvasLink('/courses/:c/gradebook', { c: i.course.id });
+    default:
+      return canvasLink('/courses/:c/assignments', { c: i.course.id });
+  }
 }
+
+const LINK_LABEL = { assignment_edit: 'Edit assignment', modules: 'Open Modules', gradebook: 'Open Gradebook', assignments_index: 'Open assignments' } as const;
 
 export function checkupView(
   issues: Issue[],
@@ -98,7 +108,13 @@ export function checkupView(
           codeChip(i.course, showCourse),
           h('span', { class: 'title plain' }, i.title),
           h('span', { class: 'meta' }, i.detail),
-          h('div', { class: 'actions' }, h('a', { class: 'btn primary', href: issueHref(i) }, i.link.kind === 'assignment_edit' ? 'Edit assignment' : 'Open assignments'), ignore)
+          h(
+            'div',
+            { class: 'actions' },
+            h('a', { class: 'btn primary', href: issueHref(i) }, LINK_LABEL[i.link.kind]),
+            PD_HELP[i.rule] ? h('a', { class: 'btn', href: canvasLink(PD_HELP[i.rule], {}), target: '_blank', rel: 'noopener' }, 'How to (PD)') : null,
+            ignore
+          )
         )
       );
     }
@@ -114,7 +130,7 @@ export function checkupView(
     h(
       'p',
       { class: 'note' },
-      'Checks: missing due dates, unpublished work that is due, lock dates before due dates, 0-point assignments, 12:00 AM due times, and group weights.'
+      'Checks the RJ Baseline (everything in Modules, missing policy on, a graded item every week, grading kept current) plus setup slips: missing or out-of-semester due dates, unpublished work that is due, open/lock dates, rubric and point mismatches, group weights, duplicate names, weekend and 12:00 AM due times.'
     )
   );
   return box;
@@ -252,6 +268,59 @@ export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLE
       { class: 'note' },
       `Shows your classes only. Canvas doesn't let teachers see what students have due in other classes. Updated ${formatDayTime(now)}.`
     )
+  );
+  return box;
+}
+
+/* ---------------- Grading coming in (Week tab) ---------------- */
+
+const SHORT_DAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const LETTER = new Intl.DateTimeFormat('en-US', { weekday: 'narrow' });
+
+export function forecastView(days: ForecastDay[], courses: TeacherCourse[], waitingNow: number | null): HTMLElement {
+  const box = h('section', { class: 'fc', 'aria-labelledby': 'rjtt-fc-title' });
+  box.append(h('h3', { id: 'rjtt-fc-title' }, 'Grading coming in · next 2 weeks'));
+  const total = days.reduce((s, d) => s + d.total, 0);
+  const max = Math.max(1, ...days.map((d) => d.total));
+  const busiest = days.reduce((b, d) => (d.total > b.total ? d : b), days[0]);
+  const bits = [total ? `About ${plural(total, 'submission')} due from students in the next 14 days.` : 'Nothing that needs your grading is due in the next 14 days.'];
+  if (total) bits.push(`Busiest: ${SHORT_DAY.format(busiest.date)} (about ${busiest.total}).`);
+  if (waitingNow !== null) bits.push(`Waiting now: ${waitingNow}.`);
+  box.append(h('p', { class: 'summary' }, bits.join(' ')));
+
+  const color = new Map(courses.map((c, i) => [c.id, i % 6]));
+  const bars = h('ol', { class: 'bars', 'aria-label': 'Submissions due each day' });
+  days.forEach((d, i) => {
+    const wd = d.date.getDay();
+    const parts = d.byCourse.map((r) => `${r.course.code} ${r.n}`).join(', ');
+    const col = h(
+      'li',
+      { class: `col${wd === 0 || wd === 6 ? ' wknd' : ''}${wd === 1 && i > 0 ? ' mon' : ''}`, title: `${SHORT_DAY.format(d.date)}: about ${d.total}${parts ? ` (${parts})` : ''}` },
+      h('span', { class: 'tot', 'aria-hidden': 'true' }, d.total ? String(d.total) : '')
+    );
+    const stack = h('div', { class: 'stack', 'aria-hidden': 'true' });
+    stack.style.height = `${Math.round((d.total / max) * 100)}%`;
+    for (const r of d.byCourse) {
+      const seg = h('span', { class: `seg c${color.get(r.course.id) ?? 0}` });
+      seg.style.flexGrow = String(r.n);
+      stack.append(seg);
+    }
+    col.append(
+      h('div', { class: 'well' }, stack),
+      h('span', { class: 'dl', 'aria-hidden': 'true' }, i === 0 ? 'Today' : LETTER.format(d.date)),
+      h('span', { class: 'sr' }, `${i === 0 ? 'Today' : SHORT_DAY.format(d.date)}: about ${plural(d.total, 'submission')}${parts ? `: ${parts}` : ''}`)
+    );
+    bars.append(col);
+  });
+  box.append(bars);
+  const shown = courses.filter((c) => days.some((d) => d.byCourse.some((r) => r.course.id === c.id)));
+  if (shown.length > 1) {
+    const legend = h('p', { class: 'legend' });
+    for (const c of shown) legend.append(h('span', {}, h('span', { class: `chip c${color.get(c.id) ?? 0}`, 'aria-hidden': 'true' }), c.code));
+    box.append(legend);
+  }
+  box.append(
+    h('p', { class: 'note' }, "Estimated from due dates and class size. Leaves out quizzes Canvas grades for you and one-student extensions. Week starts are marked; weekends are shaded.")
   );
   return box;
 }

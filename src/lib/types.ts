@@ -53,6 +53,31 @@ export interface CanvasAssignment {
   omit_from_final_grade?: boolean;
   needs_grading_count?: number;
   html_url?: string;
+  /* set when a rubric is attached */
+  rubric_settings?: { points_possible?: number | null } | null;
+  use_rubric_for_grading?: boolean;
+  /* classic quizzes and graded discussions are reached from Modules by these ids */
+  quiz_id?: string | null;
+  discussion_topic?: { id?: string } | null;
+}
+
+export interface CanvasModuleItem {
+  id: string;
+  type: string; // 'Assignment' | 'Quiz' | 'Discussion' | 'Page' | ...
+  content_id?: string | null;
+  published?: boolean;
+}
+
+export interface CanvasModule {
+  id: string;
+  name?: string;
+  published?: boolean;
+  items_count?: number;
+  items?: CanvasModuleItem[]; // left out by Canvas when a module has very many items
+}
+
+export interface CanvasLatePolicy {
+  late_policy?: { missing_submission_deduction_enabled?: boolean } | null;
 }
 
 export interface CanvasAssignmentGroup {
@@ -93,4 +118,7 @@ export interface TeacherCourse {
   name: string;
   code: string;
   weighted: boolean;
+  /* the course's term dates (ms), when Canvas gives them */
+  termStart?: number | null;
+  termEnd?: number | null;
 }

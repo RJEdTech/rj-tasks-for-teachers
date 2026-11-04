@@ -9,15 +9,19 @@ import {
   CanvasAssignmentGroup,
   CanvasCourse,
   CanvasGradingPeriod,
+  CanvasLatePolicy,
+  CanvasModule,
+  CanvasModuleItem,
   CanvasSubmission,
   CanvasUser,
   TeacherCourse,
 } from '../lib/types';
 import { teacherCourses } from './courses';
-import { buildQueue, GradingRow, queueFromCounts, sortQueue } from './grading';
+import { buildQueue, countWaiting, GradingRow, queueFromCounts, sortQueue } from './grading';
+import { addDays } from '../lib/dates';
 import { Issue, runCheckup, sortIssues } from './checkup';
 import { buildStudents, chunk, currentPeriod, pastDueIds, StudentRow } from './students';
-import { buildWeek, WeekDay } from './week';
+import { buildForecast, buildWeek, ForecastDay, WeekDay } from './week';
 
 const PARALLEL = 3;
 const IDS_PER_REQUEST = 20;
@@ -146,13 +150,67 @@ export class Loader {
     return { value: sortQueue(rows.flat()), failed, partial };
   }
 
-  async checkup(courses: TeacherCourse[], ignored: Set<string>): Promise<Loaded<Issue[]>> {
+  /* Modules with their items. Canvas leaves items out of very big modules;
+     those are fetched one module at a time. */
+  modules(cid: string): Promise<CanvasModule[]> {
+    const id = assertId(cid);
+    return this.once(`mod:${id}`, async () => {
+      const { items, truncated } = await canvasGetAll<CanvasModule>(
+        `/api/v1/courses/${id}/modules?include[]=items&per_page=100`
+      );
+      if (truncated) throw new Error('too many modules to check');
+      for (const m of items) {
+        if (Array.isArray(m.items)) continue;
+        const r = await canvasGetAll<CanvasModuleItem>(
+          `/api/v1/courses/${id}/modules/${assertId(m.id)}/items?per_page=100`
+        );
+        if (r.truncated) throw new Error('too many module items to check');
+        m.items = r.items;
+      }
+      return items;
+    });
+  }
+
+  /* true/false for "Automatically apply grade for missing submissions";
+     a course that never saved a late policy has it off. */
+  missingPolicyOn(cid: string): Promise<boolean> {
+    const id = assertId(cid);
+    return this.once(`lp:${id}`, async () => {
+      try {
+        const r = await canvasGet<CanvasLatePolicy>(`/api/v1/courses/${id}/late_policy`);
+        return !!r?.late_policy?.missing_submission_deduction_enabled;
+      } catch (e) {
+        if ((e as { status?: number }).status === 404) return false;
+        throw e;
+      }
+    });
+  }
+
+  /* Submissions (active students, graded assignments) waiting 7+ days. */
+  private async waiting7(c: TeacherCourse): Promise<number> {
+    const [assignments, r, users] = await Promise.all([
+      this.assignments(c.id),
+      this.toGradeSubmissions(c.id),
+      this.users(c.id).catch(() => null),
+    ]);
+    return countWaiting(assignments, this.activeOnly(r.subs, users), addDays(this.now(), -7));
+  }
+
+  async checkup(courses: TeacherCourse[], ignored: Set<string>, off: string[] = []): Promise<Loaded<Issue[]>> {
+    const skip = new Set(off);
     const failed: TeacherCourse[] = [];
     const now = this.now();
     const all = await mapLimit(courses, PARALLEL, async (c) => {
       try {
         const [a, g] = await Promise.all([this.assignments(c.id), this.groups(c.id)]);
-        return runCheckup(c, a, g, now);
+        // Each extra check is skipped (not guessed) if Canvas won't say.
+        // Checks turned off in Settings don't ask Canvas for anything.
+        const [modules, missingPolicyOn, waiting7] = await Promise.all([
+          skip.has('not_in_module') ? null : this.modules(c.id).catch(() => null),
+          skip.has('missing_policy') ? null : this.missingPolicyOn(c.id).catch(() => null),
+          skip.has('grading_waiting') ? null : this.waiting7(c).catch(() => null),
+        ]);
+        return runCheckup(c, a, g, now, { modules, missingPolicyOn, waiting7 }).filter((i) => !skip.has(i.rule));
       } catch {
         failed.push(c);
         return [];
@@ -220,6 +278,21 @@ export class Loader {
       }
     });
     return { value: rows.flat(), failed, partial, periodKnown };
+  }
+
+  /* Grading coming in over the next 14 days (see buildForecast). */
+  async forecast(courses: TeacherCourse[]): Promise<Loaded<ForecastDay[]>> {
+    const failed: TeacherCourse[] = [];
+    const data = await mapLimit(courses, PARALLEL, async (c) => {
+      try {
+        const [assignments, users] = await Promise.all([this.assignments(c.id), this.users(c.id)]);
+        return { course: c, assignments, students: users.length };
+      } catch {
+        failed.push(c);
+        return { course: c, assignments: [], students: 0 };
+      }
+    });
+    return { value: buildForecast(data, this.now()), failed, partial: false };
   }
 
   async week(courses: TeacherCourse[]): Promise<Loaded<WeekDay[]>> {

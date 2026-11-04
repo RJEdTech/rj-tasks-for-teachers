@@ -68,6 +68,8 @@ export function toTeacherCourse(c: CanvasCourse): TeacherCourse {
     name: c.name || c.course_code || 'Course',
     code: c.course_code || c.name || 'Course',
     weighted: !!c.apply_assignment_group_weights,
+    termStart: parse(c.term?.start_at ?? null)?.getTime() ?? null,
+    termEnd: parse(c.term?.end_at ?? null)?.getTime() ?? null,
   };
 }
 

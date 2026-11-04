@@ -3,27 +3,28 @@
   Canvas's page scripts and styles can't reach inside it, and it can't
   restyle Canvas.
 */
-import { PRODUCT_NAME } from '../lib/constants';
+import { PD_COURSE_PATH, PRODUCT_NAME } from '../lib/constants';
+import { canvasLink } from '../lib/canvasApi';
 import { TeacherCourse } from '../lib/types';
 import { Loader } from '../data/loader';
 import { Issue } from '../data/checkup';
 import { studentsAsText, StudentRow } from '../data/students';
-import { Settings, loadIgnored, saveKnownCourses, saveSettings, setIgnored } from '../lib/settings';
+import { Section, Settings, loadIgnored, saveKnownCourses, saveSettings, setIgnored } from '../lib/settings';
 import { formatDayTime } from '../lib/dates';
 import { CSS } from './styles';
 import { append, clear, h, plural } from './dom';
-import { checkupView, failedNote, gradingView, studentsView, weekView } from './views';
+import { checkupView, failedNote, forecastView, gradingView, studentsView, weekView } from './views';
 
 /* 'closed' in the shipped build; the test build uses 'open' so Playwright can see inside. */
 declare const SHADOW_MODE: 'open' | 'closed';
 
-export type Tab = 'grade' | 'checkup' | 'students' | 'week';
-const TABS: Array<[Tab, string]> = [
-  ['grade', 'To grade'],
-  ['checkup', 'Check-up'],
-  ['students', 'Students'],
-  ['week', 'Week'],
-];
+export type Tab = Section;
+export const TAB_LABELS: Record<Tab, string> = {
+  grade: 'To grade',
+  checkup: 'Check-up',
+  students: 'Students',
+  week: 'Week',
+};
 
 export interface PanelOptions {
   settings: Settings;
@@ -50,6 +51,8 @@ export class Panel {
   private status!: HTMLElement;
   private foot!: HTMLElement;
   private tabButtons = new Map<Tab, HTMLButtonElement>();
+  private tabBar!: HTMLElement;
+  private counts = new Map<Tab, number>();
   private scope: string = 'all';
   private tab: Tab = 'grade';
   private namesShown = false;
@@ -128,10 +131,16 @@ export class Panel {
     this.opts.settings = s;
     if (!s.hideNames) this.namesShown = true;
     if (!this.isOpen()) return;
+    if (this.tabBar && prev.sectionOrder.join(',') !== s.sectionOrder.join(',')) this.buildTabs();
     const classesChanged =
       prev.excludedCourses.join(',') !== s.excludedCourses.join(',') || prev.allClasses !== s.allClasses;
     if (classesChanged) void this.loadCourses(); // course list is filtered, data stays cached
-    else if (prev.missingThreshold !== s.missingThreshold || prev.hideNames !== s.hideNames) void this.renderTab();
+    else if (
+      prev.missingThreshold !== s.missingThreshold ||
+      prev.hideNames !== s.hideNames ||
+      prev.checksOff.join(',') !== s.checksOff.join(',')
+    )
+      void this.renderTab();
   }
 
   isOpen(): boolean {
@@ -177,21 +186,8 @@ export class Panel {
     close.addEventListener('click', () => this.close());
 
     const tabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Views' });
-    for (const [id, label] of TABS) {
-      const b = h('button', { class: 'tab', type: 'button', role: 'tab', id: `rjtt-tab-${id}`, 'aria-selected': 'false', 'aria-controls': 'rjtt-body', 'data-tab': id }, label) as HTMLButtonElement;
-      b.addEventListener('click', () => this.select(id));
-      b.addEventListener('keydown', (e) => {
-        const i = TABS.findIndex(([t]) => t === id);
-        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-          const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length][0];
-          this.select(next);
-          this.tabButtons.get(next)!.focus();
-          e.preventDefault();
-        }
-      });
-      this.tabButtons.set(id, b);
-      tabs.append(b);
-    }
+    this.tabBar = tabs;
+    this.buildTabs();
 
     this.status = h('span', { role: 'status', 'aria-live': 'polite' });
     const refresh = h('button', { class: 'linkbtn', type: 'button' }, 'Refresh');
@@ -202,7 +198,8 @@ export class Panel {
     });
     const settings = h('button', { class: 'linkbtn', type: 'button' }, 'Settings');
     settings.addEventListener('click', () => this.opts.openSettings());
-    this.foot = h('div', { class: 'foot' }, this.status, h('span', { class: 'spacer' }), refresh, settings);
+    const pd = h('a', { class: 'linkbtn', href: canvasLink(PD_COURSE_PATH, {}), target: '_blank', rel: 'noopener', title: 'Regis Jesuit Professional Development in Canvas' }, 'Questions?');
+    this.foot = h('div', { class: 'foot' }, this.status, h('span', { class: 'spacer' }), pd, refresh, settings);
 
     this.body = h('div', { class: 'body', id: 'rjtt-body', role: 'tabpanel', tabindex: '-1' });
 
@@ -229,6 +226,32 @@ export class Panel {
     });
     this.wrap.appendChild(this.panel);
     this.select(this.tab, false);
+  }
+
+  /* Tabs follow the order chosen in Settings. */
+  private buildTabs(): void {
+    const order = this.opts.settings.sectionOrder;
+    clear(this.tabBar);
+    this.tabButtons.clear();
+    for (const id of order) {
+      const b = h('button', { class: 'tab', type: 'button', role: 'tab', id: `rjtt-tab-${id}`, 'aria-selected': String(id === this.tab), 'aria-controls': 'rjtt-body', 'data-tab': id }, TAB_LABELS[id]) as HTMLButtonElement;
+      b.tabIndex = id === this.tab ? 0 : -1;
+      b.addEventListener('click', () => this.select(id));
+      b.addEventListener('keydown', (e) => {
+        const tabs = this.opts.settings.sectionOrder;
+        const i = tabs.indexOf(id);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+          this.select(next);
+          this.tabButtons.get(next)!.focus();
+          e.preventDefault();
+        }
+      });
+      this.tabButtons.set(id, b);
+      this.tabBar.append(b);
+      const n = this.counts.get(id);
+      if (n !== undefined) this.setCount(id, n);
+    }
   }
 
   private select(tab: Tab, render = true): void {
@@ -306,7 +329,7 @@ export class Panel {
         if (this.scope === 'all' && token === this.renderToken) this.onGradeTotal?.(total);
       } else if (this.tab === 'checkup') {
         const ignored = await loadIgnored();
-        const r = await this.loader.checkup(courses, ignored);
+        const r = await this.loader.checkup(courses, ignored, this.opts.settings.checksOff);
         const ids = new Set(courses.map((c) => c.id));
         const ignoredHere = [...ignored].filter((k) => ids.has(k.split(':')[0])).length;
         content = checkupView(r.value, ignoredHere, showCourse, (i) => this.ignore(i), () => this.unignore(courses));
@@ -339,8 +362,14 @@ export class Panel {
         });
         note = failedNote(r.failed, r.partial);
       } else {
-        const r = await this.loader.week(courses);
-        content = weekView(r.value, showCourse, now);
+        const [r, f, g] = await Promise.all([
+          this.loader.week(courses),
+          this.loader.forecast(courses).catch(() => null),
+          this.loader.toGrade(courses).catch(() => null),
+        ]);
+        content = h('div');
+        if (f) content.append(forecastView(f.value, courses, g ? g.value.reduce((s, x) => s + x.count, 0) : null));
+        content.append(weekView(r.value, showCourse, now));
         note = failedNote(r.failed, r.partial);
       }
     } catch {
@@ -353,9 +382,10 @@ export class Panel {
   }
 
   private setCount(tab: Tab, n: number): void {
+    this.counts.set(tab, n);
     const b = this.tabButtons.get(tab);
     if (!b) return;
-    const label = TABS.find(([t]) => t === tab)![1];
+    const label = TAB_LABELS[tab];
     clear(b);
     append(b, label, n ? h('span', { class: 'n' }, ` ${n}`) : null);
   }

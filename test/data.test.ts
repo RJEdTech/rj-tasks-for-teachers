@@ -2,7 +2,9 @@ import { teacherCourses, isCurrentTeachingCourse, isSemesterTerm, isCurrentSemes
 import { buildQueue, queueFromCounts, sortQueue } from '../src/data/grading';
 import { runCheckup, sortIssues } from '../src/data/checkup';
 import { buildStudents, currentPeriod, pastDueIds, studentsAsText, chunk } from '../src/data/students';
-import { buildWeek } from '../src/data/week';
+import { buildWeek, buildForecast, needsTeacherGrading } from '../src/data/week';
+import { countWaiting } from '../src/data/grading';
+import { clean, normalizeOrder } from '../src/lib/settings';
 import { CanvasAssignment, CanvasCourse, CanvasSubmission, TeacherCourse } from '../src/lib/types';
 
 // Thursday Oct 22 2026, 10:00 AM in Denver (tests run with TZ=America/Denver)
@@ -145,14 +147,14 @@ describe('check-up', () => {
     { id: 'g2', name: 'Tests', group_weight: 60 },
     { id: 'g3', name: 'Participation', group_weight: 0 },
   ];
-  const run = (list: CanvasAssignment[], course = ALG, g = groups) =>
+  const run = (list: CanvasAssignment[], course = ALG, g = course.weighted ? groups : []) =>
     runCheckup(course, list, g, NOW).map((i) => `${i.rule}:${i.key.split(':')[2]}`);
 
   it('flags a published graded assignment with no due date anywhere', () => {
     expect(run([a({ id: '1', due_at: null })], GEO)).toEqual(['no_due_date:1']);
     // a section override date counts as a due date
     expect(
-      run([a({ id: '2', due_at: null, all_dates: [{ base: true, due_at: null }, { due_at: at(25), set_type: 'CourseSection', title: 'P3' }] })], GEO)
+      run([a({ id: '2', due_at: null, all_dates: [{ base: true, due_at: null }, { due_at: at(27), set_type: 'CourseSection', title: 'P3' }] })], GEO)
     ).toEqual([]);
     // not graded, or unpublished: no flag
     expect(run([a({ id: '3', due_at: null, grading_type: 'not_graded' }), a({ id: '4', due_at: null, published: false })], GEO)).toEqual([]);
@@ -195,10 +197,118 @@ describe('check-up', () => {
     expect(over[0].detail).toContain("110%, more than 100%. Canvas doesn't scale them down");
     // three groups at 33.33% are close enough to 100
     expect(runCheckup(ALG, [], [1, 2, 3].map((i) => ({ id: `g${i}`, name: 'x', group_weight: 33.33 })), NOW)).toEqual([]);
-    // unweighted course: weights ignored
-    expect(runCheckup(GEO, [a({ id: '1', assignment_group_id: 'g3' })], groups, NOW)).toEqual([]);
+    // unweighted course: the weights are ignored by Canvas, which is its own (new) flag
+    expect(runCheckup(GEO, [a({ id: '1', assignment_group_id: 'g3' })], groups, NOW).map((i) => [i.rule, i.severity])).toEqual([['weights_off', 'check']]);
     // exact 100: fine
     expect(runCheckup(ALG, [], [{ id: 'g1', name: 'All', group_weight: 100 }], NOW)).toEqual([]);
+  });
+
+  // ---------- added in 1.1 ----------
+  const SEM: TeacherCourse = { ...GEO, termStart: new Date(2026, 6, 11).getTime(), termEnd: new Date(2027, 0, 1).getTime() };
+  const rules = (r: ReturnType<typeof runCheckup>) => r.map((i) => `${i.rule}:${i.severity}`).sort();
+  // NOW is Thu Oct 22 2026; graded items due this week (Oct 19-25) and next (Oct 26-Nov 1) keep the weekly rule quiet
+  const weekly = [a({ id: '900', name: 'This week', due_at: at(23) }), a({ id: '901', name: 'Next week', due_at: at(28) })];
+
+  it('flags due dates outside the semester (left over from copying a course)', () => {
+    const r = runCheckup(SEM, [...weekly, a({ id: '1', due_at: new Date(2025, 9, 20, 23, 59).toISOString() })], [], NOW);
+    expect(rules(r)).toEqual(['outside_term:fix']);
+    expect(r[0].detail).toContain('Oct 20, 2025');
+    expect(rules(runCheckup(SEM, [...weekly, a({ id: '2', due_at: at(30) })], [], NOW))).toEqual([]);
+    expect(rules(runCheckup(GEO, [a({ id: '1', due_at: '2025-10-20T05:59:00Z' })], [], NOW))).toEqual([]); // no term dates: skip
+  });
+
+  it('flags an assignment that opens after it is due', () => {
+    expect(run([a({ id: '1', due_at: at(26), unlock_at: at(27) })], GEO)).toEqual(['opens_after_due:1']);
+    expect(run([a({ id: '2', due_at: at(26), unlock_at: at(25) })], GEO)).toEqual([]);
+  });
+
+  it('flags upcoming weekend due dates (12:00 AM Monday counts as Sunday night)', () => {
+    expect(run([a({ id: '1', due_at: at(25) })], GEO)).toEqual(['weekend_due:1']); // Sunday 11:59 PM
+    expect(run([a({ id: '2', due_at: at(26, 0, 0) })], GEO).sort()).toEqual(['midnight_due:2', 'weekend_due:2']);
+    expect(run([a({ id: '3', due_at: at(23) })], GEO)).toEqual([]); // Friday
+    expect(run([a({ id: '4', due_at: at(18) })], GEO)).toEqual([]); // past
+    // one student's extension onto a Saturday is fine
+    expect(run([a({ id: '5', due_at: at(23), all_dates: [{ base: true, due_at: at(23) }, { due_at: at(24), set_type: 'ADHOC', title: '1 student' }] })], GEO)).toEqual([]);
+  });
+
+  it('flags rubric totals that differ from the points (fix when the rubric grades)', () => {
+    const r = runCheckup(GEO, [
+      a({ id: '1', points_possible: 25, rubric_settings: { points_possible: 20 }, use_rubric_for_grading: true }),
+      a({ id: '2', points_possible: 25, rubric_settings: { points_possible: 20 } }),
+      a({ id: '3', points_possible: 20, rubric_settings: { points_possible: 20 } }),
+    ], [], NOW);
+    expect(r.map((i) => `${i.rule}:${i.severity}:${i.title}`)).toEqual(['rubric_points:fix:Assignment 1', 'rubric_points:check:Assignment 2']);
+    expect(r[0].detail).toContain('adds up to 20 points but the assignment is worth 25');
+  });
+
+  it('flags weights that are set but turned off (fix when they total 100)', () => {
+    const r = runCheckup(GEO, [], [{ id: 'g1', name: 'Homework', group_weight: 40 }, { id: 'g2', name: 'Tests', group_weight: 60 }], NOW);
+    expect(rules(r)).toEqual(['weights_off:fix']);
+    expect(r[0].detail).toContain('Homework 40%, Tests 60%');
+    expect(runCheckup(GEO, [], [{ id: 'g1', name: 'A', group_weight: 0 }, { id: 'g2', name: 'B', group_weight: 0 }], NOW)).toEqual([]);
+  });
+
+  it('flags a points typo (5x the rest of its group)', () => {
+    const list = [10, 10, 12, 10, 1000].map((p, i) => a({ id: String(i + 1), points_possible: p, due_at: null, name: `HW ${i}` }));
+    const r = runCheckup(GEO, list, [{ id: 'g1', name: 'Homework', group_weight: 0 }], NOW).filter((i) => i.rule === 'points_typo');
+    expect(r.map((i) => i.title)).toEqual(['HW 4']);
+    expect(r[0].detail).toContain('about 10');
+  });
+
+  it('flags graded work set not to count toward the final grade', () => {
+    expect(run([a({ id: '1', omit_from_final_grade: true })], GEO)).toEqual(['omitted:1']);
+    expect(run([a({ id: '2', omit_from_final_grade: true, points_possible: 0 })], GEO)).toEqual([]);
+  });
+
+  it('flags two published assignments with the same name, once', () => {
+    expect(run([a({ id: '7', name: 'Lab 2' }), a({ id: '5', name: ' lab  2 ' }), a({ id: '6', name: 'Lab 2', published: false, due_at: null })], GEO)).toEqual(['duplicate_name:5']);
+  });
+
+  it('RJ Baseline 1: published assignments not reachable from Modules', () => {
+    const list = [
+      a({ id: '1', name: 'In a module' }),
+      a({ id: '2', name: 'Classic quiz', quiz_id: '77' }),
+      a({ id: '3', name: 'Graded discussion', discussion_topic: { id: '88' } }),
+      a({ id: '4', name: 'Loose essay' }),
+      a({ id: '5', name: 'In an unpublished module' }),
+      a({ id: '6', name: 'Unpublished item' }),
+      a({ id: '7', name: 'Draft', published: false }),
+    ];
+    const modules = [
+      { id: 'm1', published: true, items: [
+        { id: 'i1', type: 'Assignment', content_id: '1' },
+        { id: 'i2', type: 'Quiz', content_id: '77' },
+        { id: 'i3', type: 'Discussion', content_id: '88' },
+        { id: 'i4', type: 'Assignment', content_id: '6', published: false },
+      ] },
+      { id: 'm2', published: false, items: [{ id: 'i5', type: 'Assignment', content_id: '5' }] },
+    ];
+    const r = runCheckup(GEO, list, [], NOW, { modules }).filter((i) => i.rule === 'not_in_module');
+    expect(r).toHaveLength(1);
+    expect(r[0].title).toBe('3 assignments not in Modules');
+    expect(r[0].detail).toContain('Loose essay; In an unpublished module; Unpublished item');
+    expect(r[0].link).toEqual({ kind: 'modules' });
+    // couldn't read modules: skipped, not guessed
+    expect(runCheckup(GEO, list, [], NOW, { modules: null }).some((i) => i.rule === 'not_in_module')).toBe(false);
+  });
+
+  it('RJ Baseline 2 and 3: missing policy off, grading waiting 7+ days', () => {
+    expect(rules(runCheckup(GEO, [], [], NOW, { missingPolicyOn: false, waiting7: 4 }))).toEqual(['grading_waiting:fix', 'missing_policy:fix']);
+    expect(runCheckup(GEO, [], [], NOW, { missingPolicyOn: true, waiting7: 0 })).toEqual([]);
+    expect(runCheckup(GEO, [], [], NOW, { missingPolicyOn: null, waiting7: null })).toEqual([]);
+  });
+
+  it('RJ Baseline 3: a graded item due this week (Mon–Thu) and next week', () => {
+    expect(rules(runCheckup(SEM, [], [], NOW))).toEqual(['weekly_graded:check', 'weekly_graded:fix']); // Thursday: still time this week
+    expect(rules(runCheckup(SEM, [], [], new Date(2026, 9, 23, 9)))).toEqual(['weekly_graded:check']); // Friday: only next week
+    const mon = new Date(2026, 9, 19, 9);
+    expect(rules(runCheckup(SEM, [], [], mon))).toEqual(['weekly_graded:check', 'weekly_graded:fix']);
+    expect(runCheckup(SEM, weekly, [], mon)).toEqual([]);
+    // an extension for one student doesn't count as the week's graded item
+    const ext = a({ id: '9', due_at: null, all_dates: [{ due_at: at(28), set_type: 'ADHOC', title: '1 student' }] });
+    expect(rules(runCheckup(SEM, [weekly[0], ext], [], mon))).toEqual(['weekly_graded:check']);
+    // the week's key carries its date, so Ignore only hides that week
+    expect(runCheckup(SEM, [], [], NOW).map((i) => i.key)).toEqual(['2:weekly_graded:20261019', '2:weekly_graded:20261026']);
   });
 
   it('sorts fixes before checks', () => {
@@ -331,5 +441,82 @@ describe('your week', () => {
     const fri = days[1];
     expect(fri.items.map((i) => `${i.name}/${i.scope}`).sort()).toEqual(['Essay/some', 'Lab/some', 'Quiz/all', 'Test/section']);
     expect(fri.flags).toEqual([{ course: GEO, forWhom: 'Period 5', count: 2 }]);
+  });
+});
+
+describe('grading coming in (forecast)', () => {
+  it('counts students per due date for work the teacher grades, over 14 days', () => {
+    const days = buildForecast(
+      [
+        {
+          course: ALG,
+          students: 24,
+          assignments: [
+            a({ id: '1', due_at: at(23) }), // Fri
+            a({ id: '2', due_at: at(23), submission_types: ['online_quiz'] }), // Canvas grades it
+            a({ id: '3', due_at: at(23), submission_types: ['external_tool'] }), // New Quiz / tool
+            a({ id: '4', due_at: at(27), points_possible: 0 }), // nothing to grade
+            a({ id: '5', due_at: at(27), published: false }),
+            a({ id: '6', due_at: at(21) }), // already due
+            a({ id: '7', due_at: at(30), submission_types: ['on_paper'] }), // paper still needs grading
+          ],
+        },
+        {
+          course: GEO,
+          students: 20,
+          assignments: [
+            // two sections with different dates: the class is split across them
+            a({ id: '8', due_at: null, all_dates: [{ due_at: at(26), set_type: 'CourseSection', title: 'P1' }, { due_at: at(27), set_type: 'CourseSection', title: 'P3' }] }),
+            // a one-student extension adds nothing
+            a({ id: '9', due_at: null, all_dates: [{ due_at: at(28), set_type: 'ADHOC', title: '1 student' }] }),
+          ],
+        },
+      ],
+      NOW
+    );
+    expect(days).toHaveLength(14);
+    const by = Object.fromEntries(days.filter((d) => d.total).map((d) => [d.date.getDate(), d.total]));
+    expect(by).toEqual({ 23: 24, 26: 10, 27: 10, 30: 24 });
+    expect(days.find((d) => d.date.getDate() === 23)!.byCourse[0].items).toEqual(['Assignment 1']);
+  });
+  it('knows which work the teacher grades', () => {
+    expect(needsTeacherGrading(a({ id: '1', submission_types: ['online_upload'] }))).toBe(true);
+    expect(needsTeacherGrading(a({ id: '2', submission_types: ['online_quiz'] }))).toBe(false);
+    expect(needsTeacherGrading(a({ id: '3', grading_type: 'not_graded' }))).toBe(false);
+  });
+});
+
+describe('grading waiting 7+ days', () => {
+  it('counts each student once, graded assignments only, not excused', () => {
+    const cutoff = new Date(2026, 9, 15);
+    const list = [a({ id: '10' }), a({ id: '11', grading_type: 'not_graded' })];
+    const s = (o: Partial<CanvasSubmission>): CanvasSubmission => ({ assignment_id: '10', user_id: 'u1', workflow_state: 'submitted', submitted_at: new Date(2026, 9, 10).toISOString(), ...o });
+    expect(
+      countWaiting(list, [
+        s({}),
+        s({}), // same student twice
+        s({ user_id: 'u2', submitted_at: new Date(2026, 9, 20).toISOString() }), // recent
+        s({ user_id: 'u3', excused: true }),
+        s({ user_id: 'u4', assignment_id: '11' }), // not graded
+        s({ user_id: 'u5', workflow_state: 'graded' }),
+        s({ user_id: 'u6', workflow_state: 'pending_review' }),
+      ], cutoff)
+    ).toBe(2);
+  });
+});
+
+describe('settings (1.1)', () => {
+  it('keeps a valid section order and repairs a damaged one', () => {
+    expect(normalizeOrder(['week', 'students', 'grade', 'checkup'])).toEqual(['week', 'students', 'grade', 'checkup']);
+    expect(normalizeOrder(['week', 'week', 'bogus'])).toEqual(['week', 'grade', 'checkup', 'students']);
+    expect(normalizeOrder(undefined)).toEqual(['grade', 'checkup', 'students', 'week']);
+  });
+  it('defaults: this semester only, nothing hidden, every check on', () => {
+    const d = clean({});
+    expect(d.allClasses).toBe(false);
+    expect(d.cardHidden).toEqual([]);
+    expect(d.cardCollapsed).toBe(false);
+    expect(d.checksOff).toEqual([]);
+    expect(clean({ cardHidden: ['week', 'x', 'grade'], checksOff: ['weekend_due', 3, '<b>'] })).toMatchObject({ cardHidden: ['grade', 'week'], checksOff: ['weekend_due'] });
   });
 });

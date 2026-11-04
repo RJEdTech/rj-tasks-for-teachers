@@ -201,10 +201,15 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
 
   onSettingsChanged((s) => {
     const reload = filterKey(s) !== filterKey(settings) || s.missingThreshold !== settings.missingThreshold;
+    const layout =
+      s.sectionOrder.join(',') !== settings.sectionOrder.join(',') ||
+      s.cardHidden.join(',') !== settings.cardHidden.join(',') ||
+      s.checksOff.join(',') !== settings.checksOff.join(',') ||
+      s.cardCollapsed !== settings.cardCollapsed;
     settings = s;
     panel.updateSettings(s);
     if (reload) clearCardCache();
-    if (card && reload) card.updateSettings(s);
+    if (card && (reload || layout)) card.updateSettings(s);
     if (reload) showCachedBadge();
     placeButton();
   });

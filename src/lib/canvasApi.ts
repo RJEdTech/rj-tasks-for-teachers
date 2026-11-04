@@ -20,6 +20,10 @@ const ENDPOINTS: RegExp[] = [
   new RegExp(`^/api/v1/courses/${ID}/students/submissions$`),
   new RegExp(`^/api/v1/courses/${ID}/grading_periods$`),
   new RegExp(`^/api/v1/courses/${ID}/users$`),
+  // 1.1: RJ Baseline checks in Check-up (read-only)
+  new RegExp(`^/api/v1/courses/${ID}/modules$`),
+  new RegExp(`^/api/v1/courses/${ID}/modules/${ID}/items$`),
+  new RegExp(`^/api/v1/courses/${ID}/late_policy$`),
 ];
 
 export class CanvasApiError extends Error {

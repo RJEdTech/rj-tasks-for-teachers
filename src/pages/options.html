@@ -9,32 +9,50 @@
 <header class="mast"><div class="mark" aria-hidden="true">RJ</div><div><h1>RJ Tasks for Teachers</h1><p>Settings</p></div></header>
 <main>
 <p class="help">Changes save automatically. Open Canvas tabs update on their own.</p>
+<nav class="jump" aria-label="Settings sections"><a href="#s-card">My Classes card</a><a href="#s-checkup">Check-up</a><a href="#s-students">Students</a><a href="#s-classes">Classes</a><a href="#s-where">Where it shows up</a><a href="#s-help">Help</a></nav>
 <p class="saved" id="saved" role="status" aria-live="polite"></p>
 
-<fieldset>
+<fieldset id="s-card">
+<legend>My Classes card</legend>
+<p class="help">The card in Canvas’s right sidebar and the tabs in the full view follow this order. Uncheck a section to leave it off the card; it stays in the full view.</p>
+<ol class="order" id="order"></ol>
+<p><button type="button" class="btn inline" id="reset-order">Reset order</button></p>
+<label><input type="checkbox" id="cardCollapsed"> <span>Hide the card’s summary (just its title bar shows)<span class="help block">Same as the Hide button on the card. Nothing loads from Canvas until you show it again.</span></span></label>
+<p class="sr" id="order-status" role="status" aria-live="polite"></p>
+</fieldset>
+
+<fieldset id="s-checkup">
+<legend>Check-up</legend>
+<p class="help">Turn off any check you don’t want. You can also click Ignore on a single item.</p>
+<div id="checks"></div>
+<p><button type="button" class="btn inline" id="checks-all">Turn all checks on</button></p>
+</fieldset>
+
+<fieldset id="s-students">
 <legend>Students to check on</legend>
 <p class="help">List students with at least this many missing assignments this grading period.</p>
 <div id="threshold"></div>
-<label><input type="checkbox" id="hideNames"> <span>Hide student names until I click “Show names”<span class="help block">Recommended if you ever project or share your screen. Names hide again each time the panel closes.</span></span></label>
+<label><input type="checkbox" id="hideNames"> <span>Hide student names until I click “Show names”<span class="help block">Recommended if you ever project or share your screen. Names hide again each time the panel closes. The sidebar card never shows names.</span></span></label>
 </fieldset>
 
-<fieldset>
+<fieldset id="s-classes">
 <legend>Classes</legend>
 <label><input type="checkbox" id="semesterOnly"> <span>Only this semester’s classes (recommended)<span class="help block">Your academic classes in the current 1st or 2nd Semester term. PD courses, RaiderQuest, clubs, templates and sandboxes are left out. Uncheck to include every published Canvas course you teach.</span></span></label>
 <p class="help" id="classes-help">Uncheck a class to leave it out too.</p>
 <div id="classes"></div>
 </fieldset>
 
-<fieldset>
+<fieldset id="s-where">
 <legend>Where it shows up</legend>
-<p class="help">A My Classes card sits in Canvas’s right sidebar on your Dashboard (all your classes) and on each class’s home page (that class). Click any part of it for the full view.</p>
-<label><input type="checkbox" id="buttonElsewhere"> <span>Show the floating My Classes button on other Canvas pages<span class="help block">The bottom-right button also appears whenever your window is too narrow for Canvas to show its sidebar.</span></span></label>
+<p class="help">The My Classes card sits in Canvas’s right sidebar on your Dashboard (all your classes) and on each class’s home page (that class).</p>
+<label><input type="checkbox" id="buttonElsewhere"> <span>Show the floating My Classes button on other Canvas pages<span class="help block">It also appears whenever your window is too narrow for Canvas to show its sidebar.</span></span></label>
 <label><input type="checkbox" id="buttonOnGradingPages"> <span>Also show it in SpeedGrader and the Gradebook<span class="help block">Off by default so it doesn’t cover grading controls.</span></span></label>
 </fieldset>
 
-<fieldset id="feedback-box" hidden>
-<legend>Report a bug or request a feature</legend>
-<p>Something not working, or an idea for RJ Tasks for Teachers? <a id="feedback" href="#" target="_blank" rel="noopener noreferrer">Use the feedback form</a> (RJ sign-in required). A screenshot helps with bugs.</p>
+<fieldset id="s-help">
+<legend>Help and questions</legend>
+<p>Canvas questions? Start with the <a id="pd" href="#" target="_blank" rel="noopener noreferrer">Regis Jesuit Professional Development course</a> in Canvas.</p>
+<p id="feedback-box" hidden>Something not working, or an idea for RJ Tasks for Teachers? <a id="feedback" href="#" target="_blank" rel="noopener noreferrer">Use the feedback form</a> (RJ sign-in required). A screenshot helps with bugs.</p>
 </fieldset>
 
 <p class="help">RJ Tasks for Teachers reads your classes from Canvas in your browser and never changes anything there. Nothing is sent anywhere else. <a id="homepage" href="#" target="_blank" rel="noopener noreferrer">Privacy and help</a></p>

@@ -3,6 +3,19 @@
   "Ignored" check-up items are ids only and live in chrome.storage.local.
   No student names or grades are ever written to storage.
 */
+export type Section = 'grade' | 'checkup' | 'students' | 'week';
+export const SECTIONS: Section[] = ['grade', 'checkup', 'students', 'week'];
+
+/* Saved settings can be old or damaged: keep known sections once each, in
+   the saved order, and add any missing ones at the end. */
+export function normalizeOrder(saved: unknown): Section[] {
+  const out: Section[] = [];
+  if (Array.isArray(saved))
+    for (const x of saved) if (SECTIONS.includes(x as Section) && !out.includes(x as Section)) out.push(x as Section);
+  for (const x of SECTIONS) if (!out.includes(x)) out.push(x);
+  return out;
+}
+
 export interface Settings {
   missingThreshold: number; // show students with at least this many missing
   hideNames: boolean; // names stay hidden until "Show names" is clicked
@@ -10,6 +23,10 @@ export interface Settings {
   buttonOnGradingPages: boolean; // show the button in SpeedGrader and the Gradebook
   allClasses: boolean; // false: only this semester's academic classes
   buttonElsewhere: boolean; // floating button on pages without the sidebar card
+  sectionOrder: Section[]; // order of the card's sections and the panel's tabs
+  cardHidden: Section[]; // sections left out of the sidebar card (the panel keeps every tab)
+  cardCollapsed: boolean; // the card's Hide button: just its header shows
+  checksOff: string[]; // Check-up rules the teacher turned off
 }
 
 export const DEFAULTS: Settings = {
@@ -19,6 +36,10 @@ export const DEFAULTS: Settings = {
   buttonOnGradingPages: false,
   allClasses: false,
   buttonElsewhere: true,
+  sectionOrder: [...SECTIONS],
+  cardHidden: [],
+  cardCollapsed: false,
+  checksOff: [],
 };
 
 const THRESHOLDS = [1, 2, 3, 4, 5];
@@ -38,6 +59,14 @@ export function clean(raw: unknown): Settings {
       typeof r.buttonOnGradingPages === 'boolean' ? r.buttonOnGradingPages : DEFAULTS.buttonOnGradingPages,
     allClasses: typeof r.allClasses === 'boolean' ? r.allClasses : DEFAULTS.allClasses,
     buttonElsewhere: typeof r.buttonElsewhere === 'boolean' ? r.buttonElsewhere : DEFAULTS.buttonElsewhere,
+    sectionOrder: normalizeOrder(r.sectionOrder),
+    cardHidden: Array.isArray(r.cardHidden)
+      ? SECTIONS.filter((x) => (r.cardHidden as unknown[]).includes(x))
+      : [],
+    cardCollapsed: typeof r.cardCollapsed === 'boolean' ? r.cardCollapsed : false,
+    checksOff: Array.isArray(r.checksOff)
+      ? r.checksOff.filter((x): x is string => typeof x === 'string' && /^[a-z_]{1,30}$/.test(x)).slice(0, 50)
+      : [],
   };
 }
 

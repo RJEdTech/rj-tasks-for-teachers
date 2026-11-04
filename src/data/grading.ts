@@ -89,3 +89,23 @@ export function sortQueue(rows: GradingRow[]): GradingRow[] {
     return b.count - a.count || a.name.localeCompare(b.name);
   });
 }
+
+/* How many submissions (graded assignments, not excused, one per student)
+   were turned in before `cutoff` and are still waiting to be graded. */
+export function countWaiting(assignments: CanvasAssignment[], submissions: CanvasSubmission[], cutoff: Date): number {
+  const map = byId(assignments);
+  const seen = new Set<string>();
+  let n = 0;
+  for (const s of submissions) {
+    if (s.workflow_state !== 'submitted' && s.workflow_state !== 'pending_review') continue;
+    if (s.excused) continue;
+    const a = map.get(String(s.assignment_id));
+    if (!a || a.grading_type === 'not_graded') continue;
+    const k = `${s.assignment_id}:${s.user_id}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const at = parse(s.submitted_at);
+    if (at && at.getTime() < cutoff.getTime()) n++;
+  }
+  return n;
+}

@@ -1,5 +1,6 @@
-import { FEEDBACK_FORM_URL, HOMEPAGE_URL } from '../lib/constants';
-import { loadKnownCourses, loadSettings, saveSettings, Settings } from '../lib/settings';
+import { FEEDBACK_FORM_URL, HOMEPAGE_URL, PD_URL } from '../lib/constants';
+import { RULE_INFO } from '../data/checkup';
+import { loadKnownCourses, loadSettings, saveSettings, Settings, Section, SECTIONS } from '../lib/settings';
 import { h, clear } from '../ui/dom';
 
 let settings: Settings;
@@ -43,6 +44,34 @@ async function init(): Promise<void> {
   elsewhere.checked = settings.buttonElsewhere;
   elsewhere.addEventListener('change', () => void save({ ...settings, buttonElsewhere: elsewhere.checked }));
 
+  renderOrder();
+
+  const collapsed = document.getElementById('cardCollapsed') as HTMLInputElement;
+  collapsed.checked = settings.cardCollapsed;
+  collapsed.addEventListener('change', () => void save({ ...settings, cardCollapsed: collapsed.checked }));
+
+  renderChecks();
+  document.getElementById('checks-all')!.addEventListener('click', () => {
+    void save({ ...settings, checksOff: [] }).then(renderChecks);
+  });
+  (document.getElementById('pd') as HTMLAnchorElement).href = PD_URL;
+  document.getElementById('reset-order')!.addEventListener('click', () => {
+    void save({ ...settings, sectionOrder: [...SECTIONS] }).then(() => {
+      renderOrder();
+
+  const collapsed = document.getElementById('cardCollapsed') as HTMLInputElement;
+  collapsed.checked = settings.cardCollapsed;
+  collapsed.addEventListener('change', () => void save({ ...settings, cardCollapsed: collapsed.checked }));
+
+  renderChecks();
+  document.getElementById('checks-all')!.addEventListener('click', () => {
+    void save({ ...settings, checksOff: [] }).then(renderChecks);
+  });
+  (document.getElementById('pd') as HTMLAnchorElement).href = PD_URL;
+      announce('Order reset: To grade, Check-up, Students, Week.');
+    });
+  });
+
   const box = document.getElementById('classes')!;
   const known = await loadKnownCourses();
   clear(box);
@@ -66,6 +95,78 @@ async function init(): Promise<void> {
     document.getElementById('feedback-box')!.hidden = false;
   }
   (document.getElementById('homepage') as HTMLAnchorElement).href = HOMEPAGE_URL;
+}
+
+/* Every Check-up rule as a checkbox, in three groups. */
+function renderChecks(): void {
+  const box = document.getElementById('checks')!;
+  clear(box);
+  const groups: Array<[string, string]> = [
+    ['baseline', 'RJ Baseline'],
+    ['fix', 'Setup problems (to fix)'],
+    ['check', 'Worth a look'],
+  ];
+  for (const [g, title] of groups) {
+    const part = h('div', { class: 'group', role: 'group', 'aria-label': title }, h('p', { class: 'gtitle' }, title));
+    for (const r of RULE_INFO.filter((x) => x.group === g)) {
+      const cb = h('input', { type: 'checkbox', 'data-rule': r.rule }) as HTMLInputElement;
+      cb.checked = !settings.checksOff.includes(r.rule);
+      cb.addEventListener('change', () => {
+        const off = new Set(settings.checksOff);
+        if (cb.checked) off.delete(r.rule);
+        else off.add(r.rule);
+        void save({ ...settings, checksOff: RULE_INFO.map((x) => x.rule).filter((x) => off.has(x)) });
+      });
+      part.append(h('label', {}, cb, h('span', {}, r.label)));
+    }
+    box.append(part);
+  }
+}
+
+const LABELS: Record<Section, string> = { grade: 'To grade', checkup: 'Check-up', students: 'Students', week: 'Week' };
+
+function announce(msg: string): void {
+  const el = document.getElementById('order-status')!;
+  el.textContent = '';
+  window.setTimeout(() => (el.textContent = msg), 50);
+}
+
+/* Each section: a checkbox (on the sidebar card or not) and Move up / Move
+   down buttons. Buttons rather than drag and drop, so it works from the
+   keyboard; focus stays on the button that was pressed. */
+function renderOrder(focus?: { id: Section; dir: 'up' | 'down' }): void {
+  const list = document.getElementById('order')!;
+  clear(list);
+  const order = settings.sectionOrder;
+  order.forEach((id, i) => {
+    const cb = h('input', { type: 'checkbox', 'data-sec': id }) as HTMLInputElement;
+    cb.checked = !settings.cardHidden.includes(id);
+    cb.addEventListener('change', () => {
+      const hidden = new Set(settings.cardHidden);
+      if (cb.checked) hidden.delete(id);
+      else hidden.add(id);
+      void save({ ...settings, cardHidden: SECTIONS.filter((x) => hidden.has(x)) });
+    });
+    const move = (dir: 'up' | 'down') => {
+      const j = dir === 'up' ? i - 1 : i + 1;
+      if (j < 0 || j >= order.length) return;
+      const next = [...order];
+      [next[i], next[j]] = [next[j], next[i]];
+      void save({ ...settings, sectionOrder: next });
+      renderOrder({ id, dir });
+      announce(`${LABELS[id]} is now number ${j + 1} of ${order.length}.`);
+    };
+    const up = h('button', { type: 'button', class: 'arrow', 'aria-label': `Move ${LABELS[id]} up`, disabled: i === 0, 'data-move': `${id}-up` }, '↑');
+    const down = h('button', { type: 'button', class: 'arrow', 'aria-label': `Move ${LABELS[id]} down`, disabled: i === order.length - 1, 'data-move': `${id}-down` }, '↓');
+    up.addEventListener('click', () => move('up'));
+    down.addEventListener('click', () => move('down'));
+    list.append(h('li', {}, h('div', { class: 'orow' }, h('label', {}, cb, h('span', {}, LABELS[id])), h('span', { class: 'arrows' }, up, down))));
+  });
+  if (focus) {
+    const want = list.querySelector(`[data-move="${focus.id}-${focus.dir}"]`) as HTMLButtonElement | null;
+    const other = list.querySelector(`[data-move="${focus.id}-${focus.dir === 'up' ? 'down' : 'up'}"]`) as HTMLButtonElement | null;
+    (want && !want.disabled ? want : other)?.focus();
+  }
 }
 
 void init();

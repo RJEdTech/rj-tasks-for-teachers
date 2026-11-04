@@ -122,3 +122,68 @@ export function flagsFor(items: WeekItem[]): WeekFlag[] {
   }
   return flags;
 }
+
+/* ---------------- Grading coming in (1.1) ----------------
+   For planning: roughly how many submissions will land on you each day,
+   from each class's due dates and its number of active students. Quizzes
+   and outside tools that Canvas or the tool grades are left out. A date set
+   for a few students (an extension) doesn't add to the count. When an
+   assignment has different dates per section, the class is split evenly
+   across those dates (Canvas doesn't tell teachers section sizes here). */
+export interface ForecastDay {
+  date: Date;
+  key: string;
+  total: number;
+  byCourse: Array<{ course: TeacherCourse; n: number; items: string[] }>;
+}
+
+const AUTO_GRADED = new Set(['online_quiz', 'external_tool']);
+
+export function needsTeacherGrading(a: CanvasAssignment): boolean {
+  if (!a.published || !isGraded(a) || !((a.points_possible ?? 0) > 0)) return false;
+  const types = a.submission_types ?? [];
+  return !types.some((t) => AUTO_GRADED.has(t));
+}
+
+export function buildForecast(
+  data: Array<{ course: TeacherCourse; assignments: CanvasAssignment[]; students: number }>,
+  now: Date,
+  days = 14
+): ForecastDay[] {
+  const first = startOfDay(now);
+  const out: ForecastDay[] = Array.from({ length: days }, (_, i) => {
+    const date = addDays(first, i);
+    return { date, key: dayKey(date), total: 0, byCourse: [] };
+  });
+  const index = new Map(out.map((d) => [d.key, d]));
+  for (const { course, assignments, students } of data) {
+    if (!students) continue;
+    for (const a of assignments) {
+      if (!needsTeacherGrading(a)) continue;
+      const dates = datesOf(a)
+        .filter((d) => whoFor(d).scope !== 'some')
+        .map((d) => parse(d.due_at))
+        .filter((d): d is Date => !!d);
+      if (!dates.length) continue;
+      const share = students / dates.length;
+      for (const due of dates) {
+        if (due.getTime() < now.getTime()) continue;
+        const day = index.get(dayKey(due));
+        if (!day) continue;
+        let row = day.byCourse.find((r) => r.course.id === course.id);
+        if (!row) {
+          row = { course, n: 0, items: [] };
+          day.byCourse.push(row);
+        }
+        row.n += share;
+        if (!row.items.includes(a.name)) row.items.push(a.name);
+      }
+    }
+  }
+  for (const d of out) {
+    for (const r of d.byCourse) r.n = Math.round(r.n);
+    d.byCourse = d.byCourse.filter((r) => r.n > 0);
+    d.total = d.byCourse.reduce((s, r) => s + r.n, 0);
+  }
+  return out;
+}

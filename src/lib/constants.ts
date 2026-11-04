@@ -10,6 +10,15 @@ export const ALLOWED_ORIGINS = ['https://rjhs.instructure.com'];
    review teacher is enrolled. */
 export const REVIEW_COURSE_IDS = ['17272'];
 
+/* "Regis Jesuit Professional Development" in RJ Canvas: where teachers go
+   with questions. Same site, so these are ordinary Canvas links. */
+export const PD_COURSE_PATH = '/courses/5414';
+export const PD_URL = 'https://rjhs.instructure.com/courses/5414';
+/* How-to pages in that course, linked from matching Check-up items. */
+export const PD_HELP: Record<string, string> = {
+  missing_policy: '/courses/5414/pages/setting-up-our-automatic-missing-slash-late-policy-in-canvas',
+};
+
 /* Bug reports and feature requests: the RJ Tasks for Teachers Microsoft Form
    (RJ sign-in required). Opened in a new tab from the popup and settings page
    only; never fetched. */
