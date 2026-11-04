@@ -338,7 +338,6 @@ export class SidebarCard {
       h(
         'div',
         { class: 'head' },
-        h('span', { class: 'mark', 'aria-hidden': 'true' }, 'RJ'),
         h('h2', { id: 'rjtt-card-title' }, scoped ? 'This class' : 'My Classes'),
         hide,
         open
@@ -420,9 +419,8 @@ export class SidebarCard {
         h(
           'li',
           {},
-          showCourse ? h('span', { class: 'code' }, r.code) : null,
           h('a', { href }, r.name),
-          h('span', { class: 'small' }, `${r.count} to grade${r.oldest ? ` · waiting ${waitingFor(new Date(r.oldest), now)}` : ''}`)
+          h('span', { class: 'small' }, `${showCourse ? `${r.code} · ` : ''}${r.count} to grade${r.oldest ? ` · waiting ${waitingFor(new Date(r.oldest), now)}` : ''}`)
         )
       );
     }
@@ -482,16 +480,31 @@ export class SidebarCard {
   }
 }
 
-/* Where the card goes. Dashboard: top of the right sidebar, above To Do.
-   Course home: under the teacher buttons (Import, Choose Home Page...).
+/* Course home: Canvas keeps To Do under the teacher buttons, inside
+   #course_show_secondary. Lift it out to just above them, so the order is
+   this card, To Do, then the buttons. Canvas's own elements are moved, not
+   copied, so its links and "ignore" buttons keep working. */
+export function moveTodoUp(doc: Document): void {
+  const box = doc.querySelector('#right-side > #course_show_secondary');
+  const head = box?.querySelector(':scope > .todo-list-header');
+  const list = box?.querySelector(':scope > .to-do-list');
+  if (!box || !head || !list) return;
+  box.parentElement!.insertBefore(head, box);
+  box.parentElement!.insertBefore(list, box);
+}
+
+/* Where the card goes: the top of the right sidebar, above To Do on both the
+   Dashboard and a course's home page.
    Canvas fills the Dashboard sidebar after the page loads, so the caller
    re-runs this when #right-side changes. */
 export function cardSlot(doc: Document, kind: 'dashboard' | 'course'): { parent: Element; before: Node | null } | null {
   const side = doc.querySelector('#right-side');
   if (!side) return null;
   if (kind === 'course') {
-    const after = doc.querySelector('#course_show_secondary');
-    if (after && after.parentElement === side) return { parent: side, before: after.nextSibling };
+    const todo = side.querySelector(':scope > .todo-list-header');
+    if (todo) return { parent: side, before: todo };
+    const buttons = side.querySelector(':scope > #course_show_secondary');
+    if (buttons) return { parent: side, before: buttons };
   } else {
     const todo = side.querySelector(':scope > .todo-list-header');
     if (todo) return { parent: side, before: todo };

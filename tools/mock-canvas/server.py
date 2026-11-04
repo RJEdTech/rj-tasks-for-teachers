@@ -216,7 +216,8 @@ DASH_SIDE_BODY = ('<div class="ic-sidebar-logo"></div><h2 class="todo-list-heade
                   '<ul class="right-side-list to-do-list"><li>Canvas To Do item</li></ul>'
                   '<div class="events_list coming_up">Coming Up</div>')
 COURSE_SIDE = ('<div id="right-side-wrapper"><aside id="right-side"><div id="course_show_secondary">'
-               '<a href="#">Import Existing Content</a><a href="#">Choose Home Page</a></div>'
+               '<a href="#">Import Existing Content</a><a href="#">Choose Home Page</a>'
+               '<h2 class="todo-list-header">To Do</h2><ul class="right-side-list to-do-list"><li>Canvas To Do item</li></ul></div>'
                '<div class="events_list coming_up">Coming Up</div></aside></div>')
 
 

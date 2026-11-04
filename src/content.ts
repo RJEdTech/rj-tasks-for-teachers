@@ -12,7 +12,7 @@ import { isShownCourse } from './data/courses';
 import { Loader } from './data/loader';
 import { loadSettings, onSettingsChanged, Settings } from './lib/settings';
 import { Panel } from './ui/panel';
-import { SidebarCard, cardSlot, inSlot, isShown, clearCardCache } from './ui/card';
+import { SidebarCard, cardSlot, inSlot, isShown, clearCardCache, moveTodoUp } from './ui/card';
 
 const ROLE_KEY = 'rjtt-teaches-v2'; // sessionStorage: {v: 0|1, t} per filter, this tab only
 const ROLE_TTL_MS = 60 * 60 * 1000; // re-check hourly, so a new semester shows up without closing the tab
@@ -145,6 +145,7 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
         wanted = false;
       }
     }
+    if (wanted && kind === 'course') moveTodoUp(document);
     const slot = wanted ? cardSlot(document, kind) : null;
     if (slot) {
       const c = new SidebarCard({
@@ -165,6 +166,7 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
       let queued = false;
       const keepInPlace = () => {
         queued = false;
+        if (kind === 'course') moveTodoUp(document);
         const now = cardSlot(document, kind);
         if (!now) return placeButton();
         if (!inSlot(c.host, now)) {

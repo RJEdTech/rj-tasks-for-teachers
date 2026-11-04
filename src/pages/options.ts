@@ -6,6 +6,8 @@ import { h, clear } from '../ui/dom';
 let settings: Settings;
 const saved = document.getElementById('saved')!;
 
+document.getElementById('done')!.addEventListener('click', () => window.close());
+
 async function save(next: Settings): Promise<void> {
   settings = next;
   try {

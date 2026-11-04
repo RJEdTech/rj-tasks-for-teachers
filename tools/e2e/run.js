@@ -269,8 +269,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ---------- course home: card for that class ----------
   await page.goto(BASE + '/courses/102', { waitUntil: 'domcontentloaded' });
   await page.locator(C).waitFor({ timeout: 10000 });
-  const cplace = await page.evaluate(() => document.querySelector('div[data-rjtt-card]').previousElementSibling.id);
-  check('course home: card sits under the teacher buttons', cplace === 'course_show_secondary', cplace);
+  const cplace = await page.evaluate(() => {
+    const host = document.querySelector('div[data-rjtt-card]');
+    return [...host.parentElement.children].slice(0, 4).map((k) => (k === host ? 'card' : k.id || k.classList[0] )).join('|');
+  });
+  check('course home: order is card, To Do, then the teacher buttons', cplace === 'card|todo-list-header|right-side-list|course_show_secondary', cplace);
   ct = await waitCard();
   check('course home: card is for that class only', /This class/.test(ct) && /To grade\s*4/.test(ct) && !/ALGEBRA/.test(ct), ct.slice(0, 120));
   await $c('.sec[data-sec="grade"] .sec-head').click();
@@ -326,6 +329,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await opt.waitForSelector('#classes label');
   const classLabels = await opt.locator('#classes label').allTextContents();
   check('settings: lists your classes', classLabels.length === 3, classLabels.join(' | '));
+  check('settings: says how to finish, with a Done button', /click Done or close this tab/.test(await opt.locator('main > .help').first().textContent()) && await opt.locator('#done').isVisible());
+  const doneTab = await ctx.newPage();
+  await doneTab.goto(`chrome-extension://${extId}/options.html`);
+  await doneTab.locator('#done').click();
+  await doneTab.waitForEvent('close', { timeout: 3000 }).catch(() => undefined);
+  check('settings: Done closes the tab', doneTab.isClosed());
   check('settings: jump links to each section', (await opt.locator('nav.jump a').count()) === 6);
   check('settings: every Check-up check has its own switch', (await opt.locator('#checks input[type=checkbox]').count()) === 19);
   await opt.locator('#classes label', { hasText: 'ADVISEMENT' }).locator('input').uncheck();

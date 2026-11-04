@@ -128,54 +128,62 @@ details.row ul { margin: 8px 0 0; padding-left: 20px; font-size: 15px; }
 `;
 
 /*
-  The sidebar card sits inside Canvas's own right sidebar, so it matches
-  Canvas (light, Lato, 300px column) rather than following the OS dark
-  setting like the overlay panel does.
+  The sidebar card sits inside Canvas's own right sidebar, so it is built to
+  read as one more Canvas section, like To Do and Coming Up: no box or banner,
+  same type sizes, colors, heading rule and badge. Values measured on RJ's
+  live Canvas (Nov 2026). Light only, as Canvas is, and links follow the
+  school's Canvas theme color when it's available.
 */
 export const CARD_CSS = `
-:host { all: initial; display: block; margin: 0 0 20px; }
+:host { all: initial; display: block; margin: 0 0 18px; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 .card {
-  font: 14px/1.4 Lato, "Lato Extended", "Segoe UI", system-ui, Arial, sans-serif;
-  color: #273540; background: #fff; border: 1px solid #c7cdd1; border-radius: 6px; overflow: hidden;
+  --ink: #273540; --quiet: #767676; --rule: #e8eaec; --red: #c41130;
+  --link: var(--ic-link-color, #0e68b3);
+  font: 14px/1.3 "Lato Extended", Lato, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--ink);
 }
-:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
 button { font: inherit; color: inherit; }
-.head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #2a2a2a; color: #fff; border-bottom: 4px solid #C11430; }
-.mark { width: 24px; height: 24px; border-radius: 4px; background: #C11430; color: #fff; font-weight: 800; font-size: 11px; display: grid; place-items: center; flex: none; }
-.head h2 { margin: 0; font-size: 15px; font-weight: 700; flex: 1; }
-.open { background: transparent; color: #fff; border: 1px solid #6b6b6b; border-radius: 4px; padding: 2px 10px; font-size: 13px; cursor: pointer; }
-.open:hover { background: #3a3a3a; }
-.hide { background: transparent; color: #fff; border: 0; border-radius: 4px; padding: 2px 6px; font-size: 13px; cursor: pointer; text-decoration: underline; }
-.hide:hover { background: #3a3a3a; }
-.sec { padding: 6px 10px 10px; border-top: 1px solid #e5e8ea; }
-.head + .sec { border-top: 0; }
-.sec-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 0; background: none; border: 0; cursor: pointer; text-align: left; }
-.sec-head .label { font-weight: 700; font-size: 14px; color: #273540; }
-.sec-head:hover .label { text-decoration: underline; }
-.sec-head .chev { margin-left: auto; color: #6b7780; font-size: 18px; line-height: 1; }
-.pill { min-width: 22px; padding: 0 6px; border-radius: 999px; background: #e5e8ea; color: #273540; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
-.pill.red { background: #C11430; color: #fff; }
-.muted { margin: 2px 0 0; color: #5b6870; font-size: 13px; }
-.muted.pad { padding: 12px 10px; margin: 0; }
-.line { margin: 2px 0 0; font-size: 14px; }
-.small { display: block; margin: 2px 0 0; color: #5b6870; font-size: 13px; overflow-wrap: anywhere; }
-.list { list-style: none; margin: 2px 0 0; padding: 0; }
-.list li { padding: 5px 0; border-bottom: 1px solid #eef0f1; }
-.list li:last-child { border-bottom: 0; }
-.list a { color: #0b5cad; text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+
+/* heading: same as "Coming Up  View Calendar" */
+.head { display: flex; align-items: baseline; gap: 10px; padding: 0 0 6px; border-bottom: 1px solid var(--rule); }
+.head h2 { margin: 0 auto 0 0; font-size: 16px; line-height: 24px; font-weight: 700; color: var(--ink); }
+.open, .hide { padding: 0; background: none; border: 0; color: var(--link); font-size: 12px; line-height: 18px; cursor: pointer; }
+.open:hover, .hide:hover { text-decoration: underline; }
+
+.sec { padding: 10px 0 2px; }
+.sec-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 0; background: none; border: 0; cursor: pointer; text-align: left; }
+.sec-head .label { font-size: 14px; line-height: 18px; font-weight: 700; color: var(--ink); }
+.sec-head:hover .label { color: var(--link); text-decoration: underline; }
+.sec-head .chev { margin-left: auto; color: var(--quiet); font-size: 16px; line-height: 18px; }
+/* same as Canvas's To Do count badge */
+.pill { min-width: 18px; padding: 0 6px; border-radius: 9px; background: #e8eaec; color: var(--ink); font-size: 11px; line-height: 18px; text-align: center; }
+.pill.red { background: var(--red); color: #fff; }
+
+.muted, .small { margin: 3px 0 0; color: var(--quiet); font-size: 12px; line-height: 15.6px; overflow-wrap: anywhere; }
+.small { display: block; }
+.muted.pad { padding: 10px 0 0; margin: 0; }
+.line { margin: 3px 0 0; font-size: 14px; line-height: 18.2px; }
+
+/* assignment rows: same as a To Do row */
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { padding: 6px 0 0; }
+.list a { color: var(--link); text-decoration: none; overflow-wrap: anywhere; }
 .list a:hover { text-decoration: underline; }
-.code { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #5b6870; }
-.more { margin-top: 4px; padding: 0; background: none; border: 0; color: #0b5cad; font-size: 13px; cursor: pointer; text-decoration: underline; text-align: left; }
-.strip { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin: 4px 0 2px; padding: 0; }
+.more { display: block; margin: 6px 0 0; padding: 0; background: none; border: 0; color: var(--link); font-size: 12px; line-height: 15.6px; cursor: pointer; text-align: left; }
+.more:hover { text-decoration: underline; }
+
+/* the week: a tinted box for each day, so it reads at a glance */
+.strip { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin: 6px 0 0; padding: 0; }
 .strip li { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 4px; background: #f3f4f5; }
 .strip li.some { background: #e7eef7; }
-.strip li.flag { background: #fdecef; box-shadow: inset 0 -3px 0 #C11430; }
-.strip .d { font-size: 11px; color: #5b6870; line-height: 1.2; }
-.strip li:first-child .d { font-size: 9px; font-weight: 700; text-transform: uppercase; }
-.strip .n { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.strip li.flag { background: #fdecef; box-shadow: inset 0 -3px 0 var(--red); }
+.strip .d { color: #5b6870; font-size: 11px; line-height: 14px; }
+.strip .n { font-size: 15px; font-weight: 700; line-height: 20px; color: var(--ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.foot { margin: 0; padding: 6px 10px 8px; border-top: 1px solid #e5e8ea; font-size: 12px; color: #5b6870; }
-.foot a { color: #0b5cad; }
+.foot { margin: 12px 0 0; color: var(--quiet); font-size: 12px; line-height: 15.6px; }
+.foot a { color: var(--link); text-decoration: none; }
+.foot a:hover { text-decoration: underline; }
 `;
