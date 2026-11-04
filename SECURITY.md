@@ -26,7 +26,7 @@ The e2e test includes a student named `<img src=x onerror=alert(1)> Test` and ch
 ## Data handling
 
 - Student data (names, missing work, submissions) is held in memory while the panel is open and discarded on close, refresh or page change.
-- `chrome.storage.sync` holds settings only: threshold, hide-names, excluded course ids, and button placement.
+- `chrome.storage.sync` holds settings only: threshold, hide-names, excluded course ids, button placement, this-semester-only, section order, sections hidden from the card, whether the card is collapsed, and which Check-up checks are off. All validated on read.
 - `chrome.storage.local` holds the ids of ignored check-up items, and the teacher's own course ids and names so the settings page can list them.
 - `sessionStorage` on the Canvas origin (this tab only, gone when it closes) holds: whether the user teaches a class this semester (`1`/`0`, re-checked hourly), the To grade total for the badge (5 minutes), and the sidebar card's summary (5 minutes): counts, course codes, assignment titles and ids. **No student names, ids or grades** are ever cached; the card only shows how many students have missing work.
 - The sidebar card sits in Canvas's `#right-side` in its own closed shadow root, built only through `h()`; its links go through `canvasLink()`.
@@ -34,7 +34,7 @@ The e2e test includes a student named `<img src=x onerror=alert(1)> Test` and ch
 
 ## Extension pages
 
-The popup and settings pages use the CSP `default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. They can't make network requests at all. Their only outside links, opened in a new tab, are the homepage and the RJ feedback form.
+The popup and settings pages use the CSP `default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. They can't make network requests at all. Their only links, opened in a new tab, are the homepage, the RJ feedback form, and the Regis Jesuit Professional Development course on RJ Canvas (the card, panel and Check-up also link to that course and its how-to pages, on the Canvas origin through `canvasLink()`).
 
 The service worker accepts messages only from this extension's own content script in the top frame of an allowed Canvas page. It does two things: sets the toolbar badge number and opens the settings page.
 

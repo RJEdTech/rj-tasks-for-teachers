@@ -1,6 +1,6 @@
 import { teacherCourses, isCurrentTeachingCourse, isSemesterTerm, isCurrentSemester, isShownCourse } from '../src/data/courses';
 import { buildQueue, queueFromCounts, sortQueue } from '../src/data/grading';
-import { runCheckup, sortIssues } from '../src/data/checkup';
+import { runCheckup, sortIssues, activeWeeksOf } from '../src/data/checkup';
 import { buildStudents, currentPeriod, pastDueIds, studentsAsText, chunk } from '../src/data/students';
 import { buildWeek, buildForecast, needsTeacherGrading } from '../src/data/week';
 import { countWaiting } from '../src/data/grading';
@@ -214,6 +214,12 @@ describe('check-up', () => {
     expect(rules(r)).toEqual(['outside_term:fix']);
     expect(r[0].detail).toContain('Oct 20, 2025');
     expect(rules(runCheckup(SEM, [...weekly, a({ id: '2', due_at: at(30) })], [], NOW))).toEqual([]);
+    // one student's incomplete, due after the term: fine
+    const inc = a({ id: '3', due_at: at(23), all_dates: [{ base: true, due_at: at(23) }, { due_at: new Date(2027, 0, 15).toISOString(), set_type: 'ADHOC', title: '1 student' }] });
+    expect(rules(runCheckup(SEM, [...weekly, inc], [], NOW))).toEqual([]);
+    // a course whose own (enforced) end date runs past the term uses that date
+    const LATE: TeacherCourse = { ...SEM, termEnd: new Date(2027, 0, 31).getTime() };
+    expect(rules(runCheckup(LATE, [...weekly, a({ id: '4', due_at: new Date(2027, 0, 20, 23, 59).toISOString() })], [], NOW))).toEqual([]);
     expect(rules(runCheckup(GEO, [a({ id: '1', due_at: '2025-10-20T05:59:00Z' })], [], NOW))).toEqual([]); // no term dates: skip
   });
 
@@ -224,7 +230,7 @@ describe('check-up', () => {
 
   it('flags upcoming weekend due dates (12:00 AM Monday counts as Sunday night)', () => {
     expect(run([a({ id: '1', due_at: at(25) })], GEO)).toEqual(['weekend_due:1']); // Sunday 11:59 PM
-    expect(run([a({ id: '2', due_at: at(26, 0, 0) })], GEO).sort()).toEqual(['midnight_due:2', 'weekend_due:2']);
+    expect(run([a({ id: '2', due_at: at(26, 0, 0) })], GEO)).toEqual(['midnight_due:2']); // one item, not two
     expect(run([a({ id: '3', due_at: at(23) })], GEO)).toEqual([]); // Friday
     expect(run([a({ id: '4', due_at: at(18) })], GEO)).toEqual([]); // past
     // one student's extension onto a Saturday is fine
@@ -241,9 +247,9 @@ describe('check-up', () => {
     expect(r[0].detail).toContain('adds up to 20 points but the assignment is worth 25');
   });
 
-  it('flags weights that are set but turned off (fix when they total 100)', () => {
+  it('flags weights that are set but turned off (worth a look: may be leftovers)', () => {
     const r = runCheckup(GEO, [], [{ id: 'g1', name: 'Homework', group_weight: 40 }, { id: 'g2', name: 'Tests', group_weight: 60 }], NOW);
-    expect(rules(r)).toEqual(['weights_off:fix']);
+    expect(rules(r)).toEqual(['weights_off:check']);
     expect(r[0].detail).toContain('Homework 40%, Tests 60%');
     expect(runCheckup(GEO, [], [{ id: 'g1', name: 'A', group_weight: 0 }, { id: 'g2', name: 'B', group_weight: 0 }], NOW)).toEqual([]);
   });
@@ -288,27 +294,52 @@ describe('check-up', () => {
     expect(r[0].title).toBe('3 assignments not in Modules');
     expect(r[0].detail).toContain('Loose essay; In an unpublished module; Unpublished item');
     expect(r[0].link).toEqual({ kind: 'modules' });
+    // Ignore covers exactly this set: a new loose assignment gets a new key
+    const more = runCheckup(GEO, [...list, a({ id: '8', name: 'New essay' })], [], NOW, { modules }).find((i) => i.rule === 'not_in_module')!;
+    expect(more.key).not.toBe(r[0].key);
+    expect(more.key).toMatch(/^\d{1,20}:not_in_module:\d{1,20}$/);
     // couldn't read modules: skipped, not guessed
     expect(runCheckup(GEO, list, [], NOW, { modules: null }).some((i) => i.rule === 'not_in_module')).toBe(false);
   });
 
   it('RJ Baseline 2 and 3: missing policy off, grading waiting 7+ days', () => {
-    expect(rules(runCheckup(GEO, [], [], NOW, { missingPolicyOn: false, waiting7: 4 }))).toEqual(['grading_waiting:fix', 'missing_policy:fix']);
+    const r = runCheckup(GEO, [], [], NOW, { missingPolicyOn: false, waiting7: 4 });
+    expect(rules(r)).toEqual(['grading_waiting:fix', 'missing_policy:fix']);
+    // ignoring "waiting 7+ days" lasts for this week only
+    expect(r.find((i) => i.rule === 'grading_waiting')!.key).toBe('2:grading_waiting:20261019');
     expect(runCheckup(GEO, [], [], NOW, { missingPolicyOn: true, waiting7: 0 })).toEqual([]);
     expect(runCheckup(GEO, [], [], NOW, { missingPolicyOn: null, waiting7: null })).toEqual([]);
   });
 
   it('RJ Baseline 3: a graded item due this week (Mon–Thu) and next week', () => {
-    expect(rules(runCheckup(SEM, [], [], NOW))).toEqual(['weekly_graded:check', 'weekly_graded:fix']); // Thursday: still time this week
-    expect(rules(runCheckup(SEM, [], [], new Date(2026, 9, 23, 9)))).toEqual(['weekly_graded:check']); // Friday: only next week
+    // the class has graded work before (so it has started), none this week or next
+    const earlier = a({ id: '800', name: 'Earlier', due_at: at(9) });
+    expect(rules(runCheckup(SEM, [earlier], [], NOW))).toEqual(['weekly_graded:check', 'weekly_graded:fix']); // Thursday: still time
+    expect(rules(runCheckup(SEM, [earlier], [], new Date(2026, 9, 23, 9)))).toEqual(['weekly_graded:check']); // Friday: only next week
     const mon = new Date(2026, 9, 19, 9);
-    expect(rules(runCheckup(SEM, [], [], mon))).toEqual(['weekly_graded:check', 'weekly_graded:fix']);
-    expect(runCheckup(SEM, weekly, [], mon)).toEqual([]);
+    expect(runCheckup(SEM, [earlier, ...weekly], [], mon)).toEqual([]);
     // an extension for one student doesn't count as the week's graded item
     const ext = a({ id: '9', due_at: null, all_dates: [{ due_at: at(28), set_type: 'ADHOC', title: '1 student' }] });
-    expect(rules(runCheckup(SEM, [weekly[0], ext], [], mon))).toEqual(['weekly_graded:check']);
+    expect(rules(runCheckup(SEM, [earlier, weekly[0], ext], [], mon))).toEqual(['weekly_graded:check']);
+    // planned but not yet published counts (some teachers publish on the day)
+    expect(rules(runCheckup(SEM, [earlier, weekly[0], a({ id: '10', due_at: at(28), published: false })], [], mon))).toEqual([]);
     // the week's key carries its date, so Ignore only hides that week
-    expect(runCheckup(SEM, [], [], NOW).map((i) => i.key)).toEqual(['2:weekly_graded:20261019', '2:weekly_graded:20261026']);
+    expect(runCheckup(SEM, [earlier], [], NOW).map((i) => i.key)).toEqual(['2:weekly_graded:20261019', '2:weekly_graded:20261026']);
+  });
+
+  it('RJ Baseline 3 stays quiet in summer and break weeks', () => {
+    const july = new Date(2026, 6, 21, 9); // term has started, school hasn't
+    const first = a({ id: '1', due_at: new Date(2026, 7, 20, 23, 59).toISOString() });
+    expect(runCheckup(SEM, [first], [], july)).toEqual([]);
+    // Thanksgiving: nothing due anywhere that week, so it's a break
+    const thanksMon = new Date(2026, 10, 23, 9);
+    const before = a({ id: '2', due_at: new Date(2026, 10, 20, 23, 59).toISOString() });
+    const after = a({ id: '3', due_at: new Date(2026, 11, 4, 23, 59).toISOString() });
+    const activeWeeks = activeWeeksOf([[before, after]]);
+    expect(rules(runCheckup(SEM, [before, after], [], thanksMon, { activeWeeks }))).toEqual([]); // and next week has graded work
+    // ...but if another class has work due Thanksgiving week, it isn't a break
+    const other = a({ id: '4', due_at: new Date(2026, 10, 24, 23, 59).toISOString() });
+    expect(rules(runCheckup(SEM, [before, after], [], thanksMon, { activeWeeks: activeWeeksOf([[before, after], [other]]) }))).toEqual(['weekly_graded:fix']);
   });
 
   it('sorts fixes before checks', () => {

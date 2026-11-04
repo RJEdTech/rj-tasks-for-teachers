@@ -19,11 +19,12 @@ import {
 import { teacherCourses } from './courses';
 import { buildQueue, countWaiting, GradingRow, queueFromCounts, sortQueue } from './grading';
 import { addDays } from '../lib/dates';
-import { Issue, runCheckup, sortIssues } from './checkup';
+import { activeWeeksOf, Issue, runCheckup, sortIssues } from './checkup';
 import { buildStudents, chunk, currentPeriod, pastDueIds, StudentRow } from './students';
 import { buildForecast, buildWeek, ForecastDay, WeekDay } from './week';
 
 const PARALLEL = 3;
+const MAX_MODULE_FETCHES = 30; // modules whose items Canvas left out, fetched one by one
 const IDS_PER_REQUEST = 20;
 
 export interface Loaded<T> {
@@ -159,6 +160,7 @@ export class Loader {
         `/api/v1/courses/${id}/modules?include[]=items&per_page=100`
       );
       if (truncated) throw new Error('too many modules to check');
+      if (items.filter((m) => !Array.isArray(m.items)).length > MAX_MODULE_FETCHES) throw new Error('too many modules to check');
       for (const m of items) {
         if (Array.isArray(m.items)) continue;
         const r = await canvasGetAll<CanvasModuleItem>(
@@ -196,21 +198,32 @@ export class Loader {
     return countWaiting(assignments, this.activeOnly(r.subs, users), addDays(this.now(), -7));
   }
 
-  async checkup(courses: TeacherCourse[], ignored: Set<string>, off: string[] = []): Promise<Loaded<Issue[]>> {
+  /* A Baseline fact that couldn't be read stays "unknown" (null) for the
+     rest of this page, instead of being asked for again on every view. */
+  private soft<T>(key: string, fn: () => Promise<T>): Promise<T | null> {
+    return this.once(`soft:${key}`, () => fn().catch(() => null));
+  }
+
+  /* `allCourses`: every class shown to this teacher, so a one-class view
+     still knows which weeks are breaks. */
+  async checkup(courses: TeacherCourse[], ignored: Set<string>, off: string[] = [], allCourses: TeacherCourse[] = courses): Promise<Loaded<Issue[]>> {
     const skip = new Set(off);
     const failed: TeacherCourse[] = [];
     const now = this.now();
+    // Weeks with anything due in any of this teacher's classes (breaks have none).
+    const lists = await Promise.all(allCourses.map((c) => this.assignments(c.id).catch(() => [] as CanvasAssignment[])));
+    const activeWeeks = activeWeeksOf(lists);
     const all = await mapLimit(courses, PARALLEL, async (c) => {
       try {
         const [a, g] = await Promise.all([this.assignments(c.id), this.groups(c.id)]);
         // Each extra check is skipped (not guessed) if Canvas won't say.
         // Checks turned off in Settings don't ask Canvas for anything.
         const [modules, missingPolicyOn, waiting7] = await Promise.all([
-          skip.has('not_in_module') ? null : this.modules(c.id).catch(() => null),
-          skip.has('missing_policy') ? null : this.missingPolicyOn(c.id).catch(() => null),
-          skip.has('grading_waiting') ? null : this.waiting7(c).catch(() => null),
+          skip.has('not_in_module') ? null : this.soft(`mod:${c.id}`, () => this.modules(c.id)),
+          skip.has('missing_policy') ? null : this.soft(`lp:${c.id}`, () => this.missingPolicyOn(c.id)),
+          skip.has('grading_waiting') ? null : this.soft(`w7:${c.id}`, () => this.waiting7(c)),
         ]);
-        return runCheckup(c, a, g, now, { modules, missingPolicyOn, waiting7 }).filter((i) => !skip.has(i.rule));
+        return runCheckup(c, a, g, now, { modules, missingPolicyOn, waiting7, activeWeeks }).filter((i) => !skip.has(i.rule));
       } catch {
         failed.push(c);
         return [];

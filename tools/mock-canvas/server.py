@@ -21,6 +21,7 @@ HERE = __file__.rsplit("/", 1)[0]
 TZ = ZoneInfo("America/Denver")
 WRITES = []
 API_COUNT = [0]
+ITEM_FETCHES = []
 
 
 def now():
@@ -98,15 +99,15 @@ def modules_for(cid):
     module whose items Canvas leaves out (fetched separately). 103: none."""
     if cid == "101":
         ids = [a["id"] for a in assignments_for("101") if a["id"] != "1008"]
-        return [{"id": "m1", "name": "Unit 2-3", "published": True,
+        return [{"id": "501", "name": "Unit 2-3", "published": True,
                  "items": [{"id": f"i{x}", "type": "Assignment", "content_id": x, "published": True} for x in ids]}]
     if cid == "102":
-        return [{"id": "m2", "name": "Chapter 4", "published": True, "items_count": 99}]
+        return [{"id": "502", "name": "Chapter 4", "published": True, "items_count": 99}]
     return []
 
 
 def module_items_for(cid, mid):
-    if cid == "102" and mid == "m2":
+    if cid == "102" and mid == "502":
         return [{"id": f"j{a['id']}", "type": "Assignment", "content_id": a["id"], "published": True} for a in assignments_for("102")]
     return []
 
@@ -259,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/dashboard-sidebar":
             return self.send(200, "text/html; charset=utf-8", DASH_SIDE_BODY)
         if p == "/__api_count":
-            return self.json({"n": API_COUNT[0]})
+            return self.json({"n": API_COUNT[0], "item_fetches": ITEM_FETCHES})
         if p == "/__writes":
             return self.json(WRITES)
         if p == "/":
@@ -290,6 +291,7 @@ class Handler(BaseHTTPRequestHandler):
             if rest == "modules":
                 return self.json(modules_for(cid))
             if rest.startswith("modules/") and rest.endswith("/items"):
+                ITEM_FETCHES.append(rest)
                 return self.json(module_items_for(cid, rest.split("/")[1]))
             if rest == "late_policy":
                 if cid == "103":

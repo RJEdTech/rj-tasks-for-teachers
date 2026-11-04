@@ -62,6 +62,10 @@ export interface CheckupExtra {
   modules?: CanvasModule[] | null;
   missingPolicyOn?: boolean | null;
   waiting7?: number | null;
+  /* Weeks (Monday dayKey) when anything at all is due in any of the
+     teacher's classes. A week with nothing due anywhere is treated as a
+     break (Thanksgiving, winter break), so the weekly check stays quiet. */
+  activeWeeks?: Set<string> | null;
 }
 
 export type IssueLink =
@@ -270,7 +274,10 @@ function perAssignmentExtras(course: TeacherCourse, a: CanvasAssignment, now: Da
 
   // Due outside this semester: usually a date left over from copying last year's course.
   if (course.termStart && course.termEnd) {
-    const out = dueDates(a)
+    const out = dates
+      .filter((d) => whoFor(d).scope !== 'some') // an incomplete/extension past the term is fine
+      .map((d) => parse(d.due_at))
+      .filter((d): d is Date => !!d)
       .filter((d) => d.getTime() < course.termStart! - DAY || d.getTime() > course.termEnd! + DAY)
       .sort((x, y) => x.getTime() - y.getTime())[0];
     if (out)
@@ -301,10 +308,10 @@ function perAssignmentExtras(course: TeacherCourse, a: CanvasAssignment, now: Da
       const due = parse(d.due_at);
       if (!due || due.getTime() <= now.getTime() || due.getTime() > horizon) continue;
       if (whoFor(d).scope === 'some') continue; // one student's extension
-      const night = isLocalMidnight(due) ? addDays(due, -1) : due;
-      const wd = night.getDay();
+      if (isLocalMidnight(due)) continue; // the 12:00 AM check already explains which night
+      const wd = due.getDay();
       if (wd === 0 || wd === 6) {
-        add('weekend_due', 'check', a, `Due ${formatDayTime(due)}, which falls on a ${night.toLocaleDateString('en-US', { weekday: 'long' })}.`, due.getTime());
+        add('weekend_due', 'check', a, `Due ${formatDayTime(due)}, which falls on a ${due.toLocaleDateString('en-US', { weekday: 'long' })}.`, due.getTime());
         break;
       }
     }
@@ -347,13 +354,12 @@ function courseLevelExtras(
     const weights = groups.map((g) => g.group_weight ?? 0);
     const total = weights.reduce((x, y) => x + y, 0);
     if (total > 0) {
-      const sum100 = Math.abs(total - 100) <= WEIGHT_TOLERANCE;
       push(
         'weights_off',
-        sum100 ? 'fix' : 'check',
+        'check',
         'course',
         'Assignment group weights',
-        `Your groups have weights (${groups.filter((g) => (g.group_weight ?? 0) > 0).map((g) => `${g.name} ${round(g.group_weight ?? 0)}%`).slice(0, 4).join(', ')}), but "Weight final grade based on assignment groups" is off, so Canvas ignores them and grades by total points.`,
+        `Your groups have weights (${groups.filter((g) => (g.group_weight ?? 0) > 0).map((g) => `${g.name} ${round(g.group_weight ?? 0)}%`).slice(0, 4).join(', ')}), but "Weight final grade based on assignment groups" is off, so Canvas grades by total points. If you meant to weight, turn it on; if these are leftovers from a copied course, click Ignore.`,
         { kind: 'assignments_index' },
         0
       );
@@ -417,7 +423,7 @@ function courseLevelExtras(
       push(
         'not_in_module',
         'fix',
-        'course',
+        idsKey(missing.map((a) => String(a.id))), // a new loose assignment brings it back after Ignore
         missing.length === 1 ? '1 assignment not in Modules' : `${missing.length} assignments not in Modules`,
         `${names}${missing.length > 3 ? `; and ${missing.length - 3} more` : ''}. Students can't reach ${missing.length === 1 ? 'it' : 'them'} from Modules. RJ Baseline 1: every assignment in a module.`,
         { kind: 'modules' },
@@ -446,7 +452,7 @@ function courseLevelExtras(
     push(
       'grading_waiting',
       'fix',
-      'course',
+      dayKey(mondayOf(now)).replace(/\D/g, ''), // Ignore lasts for this week only
       'Grading waiting 7+ days',
       `${extra.waiting7} ${extra.waiting7 === 1 ? 'submission has' : 'submissions have'} waited more than 7 days to be graded. RJ Baseline 3: keep grading current.`,
       { kind: 'gradebook' },
@@ -456,7 +462,19 @@ function courseLevelExtras(
   }
 
   // RJ Baseline 3: a graded item every week (this week and next).
-  if (course.termStart && course.termEnd && now.getTime() >= course.termStart && now.getTime() < course.termEnd) {
+  // Quiet before the class's first graded due date (summer), and in weeks
+  // when nothing at all is due in any of the teacher's classes (breaks).
+  // Work planned but not yet published counts: some teachers publish on the day.
+  const gradedDue = (a: CanvasAssignment) =>
+    isGraded(a) && (a.points_possible ?? 0) > 0 && !ATTENDANCE.test(a.name.trim())
+      ? datesOf(a)
+          .filter((d) => whoFor(d).scope !== 'some')
+          .map((d) => parse(d.due_at))
+          .filter((d): d is Date => !!d)
+      : [];
+  const allGraded = assignments.flatMap(gradedDue);
+  const firstGraded = allGraded.length ? Math.min(...allGraded.map((d) => d.getTime())) : null;
+  if (course.termStart && course.termEnd && firstGraded !== null && now.getTime() >= course.termStart && now.getTime() < course.termEnd) {
     const monday = mondayOf(now);
     const weeks: Array<{ start: Date; label: 'this' | 'next' }> = [];
     if (now.getDay() >= 1 && now.getDay() <= 4) weeks.push({ start: monday, label: 'this' }); // Mon–Thu: still time
@@ -464,15 +482,9 @@ function courseLevelExtras(
     if (nextMon.getTime() < course.termEnd) weeks.push({ start: nextMon, label: 'next' });
     for (const w of weeks) {
       const end = addDays(w.start, 7).getTime();
-      const any = published.some(
-        (a) =>
-          counts(a) &&
-          datesOf(a).some((d) => {
-            const due = parse(d.due_at);
-            return !!due && whoFor(d).scope !== 'some' && due.getTime() >= w.start.getTime() && due.getTime() < end;
-          })
-      );
-      if (any) continue;
+      if (end <= firstGraded) continue; // before this class's first graded work
+      if (extra.activeWeeks && !extra.activeWeeks.has(dayKey(w.start))) continue; // a break week
+      if (allGraded.some((d) => d.getTime() >= w.start.getTime() && d.getTime() < end)) continue;
       const range = `${formatDay(w.start)} – ${formatDay(addDays(w.start, 6))}`;
       push(
         'weekly_graded',
@@ -486,6 +498,29 @@ function courseLevelExtras(
       );
     }
   }
+}
+
+/* Monday (dayKey) of every week with anything due in these classes. */
+export function activeWeeksOf(lists: CanvasAssignment[][]): Set<string> {
+  const out = new Set<string>();
+  for (const list of lists)
+    for (const a of list)
+      for (const d of datesOf(a)) {
+        const due = parse(d.due_at);
+        if (due && whoFor(d).scope !== 'some') out.add(dayKey(mondayOf(due)));
+      }
+  return out;
+}
+
+/* A short digit key for a set of ids (FNV-1a), so Ignore covers exactly
+   that set and a new item brings the warning back. */
+function idsKey(ids: string[]): string {
+  let h = 0x811c9dc5;
+  for (const ch of [...ids].sort().join(',')) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return String(h);
 }
 
 export function reachableFromModules(modules: CanvasModule[]): {

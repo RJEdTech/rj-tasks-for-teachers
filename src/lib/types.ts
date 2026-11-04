@@ -18,6 +18,7 @@ export interface CanvasCourse {
   name: string;
   course_code?: string;
   workflow_state?: string; // 'available' when published, 'unpublished', 'completed'
+  start_at?: string | null;
   end_at?: string | null;
   restrict_enrollments_to_course_dates?: boolean;
   term?: CanvasTerm | null;

@@ -1,6 +1,6 @@
 import { FEEDBACK_FORM_URL, HOMEPAGE_URL, PD_URL } from '../lib/constants';
 import { RULE_INFO } from '../data/checkup';
-import { loadKnownCourses, loadSettings, saveSettings, Settings, Section, SECTIONS } from '../lib/settings';
+import { loadKnownCourses, loadSettings, onSettingsChanged, saveSettings, Settings, Section, SECTIONS } from '../lib/settings';
 import { h, clear } from '../ui/dom';
 
 let settings: Settings;
@@ -58,16 +58,6 @@ async function init(): Promise<void> {
   document.getElementById('reset-order')!.addEventListener('click', () => {
     void save({ ...settings, sectionOrder: [...SECTIONS] }).then(() => {
       renderOrder();
-
-  const collapsed = document.getElementById('cardCollapsed') as HTMLInputElement;
-  collapsed.checked = settings.cardCollapsed;
-  collapsed.addEventListener('change', () => void save({ ...settings, cardCollapsed: collapsed.checked }));
-
-  renderChecks();
-  document.getElementById('checks-all')!.addEventListener('click', () => {
-    void save({ ...settings, checksOff: [] }).then(renderChecks);
-  });
-  (document.getElementById('pd') as HTMLAnchorElement).href = PD_URL;
       announce('Order reset: To grade, Check-up, Students, Week.');
     });
   });
@@ -79,7 +69,7 @@ async function init(): Promise<void> {
     box.append(h('p', { class: 'help' }, 'Open Canvas and click My Classes once, and your classes will show up here. (After changing “Only this semester’s classes,” open My Classes again to refresh this list.)'));
   }
   for (const c of known) {
-    const input = h('input', { type: 'checkbox' }) as HTMLInputElement;
+    const input = h('input', { type: 'checkbox', 'data-course': c.id }) as HTMLInputElement;
     input.checked = !settings.excludedCourses.includes(c.id);
     input.addEventListener('change', () => {
       const ex = new Set(settings.excludedCourses);
@@ -95,6 +85,35 @@ async function init(): Promise<void> {
     document.getElementById('feedback-box')!.hidden = false;
   }
   (document.getElementById('homepage') as HTMLAnchorElement).href = HOMEPAGE_URL;
+
+  // Settings can change elsewhere (the card's Hide button, another window):
+  // keep every control in step, so a later save here can't undo them.
+  onSettingsChanged((s) => {
+    settings = s;
+    const set = (id: string, v: boolean) => ((document.getElementById(id) as HTMLInputElement).checked = v);
+    set('hideNames', s.hideNames);
+    set('buttonOnGradingPages', s.buttonOnGradingPages);
+    set('buttonElsewhere', s.buttonElsewhere);
+    set('semesterOnly', !s.allClasses);
+    set('cardCollapsed', s.cardCollapsed);
+    document.querySelectorAll<HTMLInputElement>('#threshold input').forEach((r) => (r.checked = Number(r.value) === s.missingThreshold));
+    document.querySelectorAll<HTMLInputElement>('#classes input[data-course]').forEach((c) => (c.checked = !s.excludedCourses.includes(c.dataset.course!)));
+    const active = document.activeElement as HTMLElement | null;
+    const move = active?.getAttribute('data-move');
+    const rule = active?.getAttribute('data-rule');
+    const sec = active?.getAttribute('data-sec');
+    renderOrder();
+    renderChecks();
+    // keep keyboard focus where it was
+    const again = move
+      ? document.querySelector<HTMLElement>(`[data-move="${move}"]`)
+      : rule
+        ? document.querySelector<HTMLElement>(`#checks [data-rule="${rule}"]`)
+        : sec
+          ? document.querySelector<HTMLElement>(`#order [data-sec="${sec}"]`)
+          : null;
+    if (again && !(again as HTMLButtonElement).disabled) again.focus();
+  });
 }
 
 /* Every Check-up rule as a checkbox, in three groups. */

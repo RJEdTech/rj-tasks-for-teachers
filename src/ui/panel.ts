@@ -329,7 +329,7 @@ export class Panel {
         if (this.scope === 'all' && token === this.renderToken) this.onGradeTotal?.(total);
       } else if (this.tab === 'checkup') {
         const ignored = await loadIgnored();
-        const r = await this.loader.checkup(courses, ignored, this.opts.settings.checksOff);
+        const r = await this.loader.checkup(courses, ignored, this.opts.settings.checksOff, this.courses);
         const ids = new Set(courses.map((c) => c.id));
         const ignoredHere = [...ignored].filter((k) => ids.has(k.split(':')[0])).length;
         content = checkupView(r.value, ignoredHere, showCourse, (i) => this.ignore(i), () => this.unignore(courses));

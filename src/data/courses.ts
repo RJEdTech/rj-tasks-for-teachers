@@ -68,8 +68,9 @@ export function toTeacherCourse(c: CanvasCourse): TeacherCourse {
     name: c.name || c.course_code || 'Course',
     code: c.course_code || c.name || 'Course',
     weighted: !!c.apply_assignment_group_weights,
-    termStart: parse(c.term?.start_at ?? null)?.getTime() ?? null,
-    termEnd: parse(c.term?.end_at ?? null)?.getTime() ?? null,
+    // Canvas enforces a course's own dates over the term's when this is set.
+    termStart: ((c.restrict_enrollments_to_course_dates ? parse(c.start_at ?? null) : null) ?? parse(c.term?.start_at ?? null))?.getTime() ?? null,
+    termEnd: ((c.restrict_enrollments_to_course_dates ? parse(c.end_at) : null) ?? parse(c.term?.end_at ?? null))?.getTime() ?? null,
   };
 }
 

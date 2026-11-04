@@ -15,7 +15,7 @@
 */
 import { canvasLink } from '../lib/canvasApi';
 import { PD_COURSE_PATH } from '../lib/constants';
-import { Settings, loadIgnored, saveSettings } from '../lib/settings';
+import { Settings, loadIgnored, loadSettings, saveSettings } from '../lib/settings';
 import { TeacherCourse } from '../lib/types';
 import { Loader } from '../data/loader';
 import { GradingRow } from '../data/grading';
@@ -152,10 +152,35 @@ export class SidebarCard {
     }
     this.wrap = h('section', { class: 'card', 'aria-labelledby': 'rjtt-card-title' });
     this.root.appendChild(this.wrap);
+    // Remember what had keyboard focus, in case Canvas re-renders its
+    // sidebar and the card has to be put back (which drops focus).
+    this.wrap.addEventListener('focusin', (e) => {
+      const t = e.target as HTMLElement;
+      this.lastFocus = { cls: t.className, sec: t.closest('.sec')?.getAttribute('data-sec') ?? null };
+    });
+    this.wrap.addEventListener('focusout', () => (this.lostAt = Date.now()));
+  }
+
+  private lastFocus: { cls: string; sec: string | null } | null = null;
+  private lostAt = 0;
+
+  /* After the card is moved back into the sidebar: if it had focus a moment
+     ago and nothing else has it now, give it back. */
+  refocusAfterMove(): void {
+    const idle = document.activeElement === document.body || document.activeElement === null;
+    if (!this.lastFocus || !idle || Date.now() - this.lostAt > 1000) return;
+    const f = this.lastFocus;
+    const el = f.sec
+      ? this.sections.get(f.sec as Tab)?.querySelector<HTMLElement>('.sec-head')
+      : this.wrap.querySelector<HTMLElement>(f.cls === 'hide' ? '.hide' : '.open');
+    el?.focus();
   }
 
   private cacheKey(): string {
-    const s = this.opts.settings;
+    return this.cacheKeyFor(this.opts.settings);
+  }
+
+  private cacheKeyFor(s: Settings): string {
     return [
       this.opts.courseId ?? 'all',
       s.allClasses ? 'all' : 'sem',
@@ -166,9 +191,17 @@ export class SidebarCard {
     ].join('|');
   }
 
+  /* What the card's contents depend on. */
+  private layoutKey(s: Settings): string {
+    return [this.cacheKeyFor(s), s.sectionOrder.join(','), s.cardCollapsed].join('#');
+  }
+
+  /* Always keeps the latest settings (so Hide can't save a stale copy);
+     reloads only when something the card shows has changed. */
   updateSettings(s: Settings): void {
+    const changed = this.layoutKey(s) !== this.layoutKey(this.opts.settings);
     this.opts.settings = s;
-    void this.load();
+    if (changed) void this.load();
   }
 
   /* After Refresh or Ignore in the panel: drop the cached summary and reload. */
@@ -212,8 +245,9 @@ export class SidebarCard {
     }
 
     let courses: TeacherCourse[];
+    let all: TeacherCourse[];
     try {
-      const all = await this.opts.loader.courses(this.opts.settings.excludedCourses, this.opts.settings.allClasses);
+      all = await this.opts.loader.courses(this.opts.settings.excludedCourses, this.opts.settings.allClasses);
       courses = scoped ? all.filter((c) => c.id === this.opts.courseId) : all;
     } catch {
       if (live()) this.message("Couldn't reach Canvas. Refresh the page to try again.");
@@ -245,7 +279,7 @@ export class SidebarCard {
         summary.week = summarizeWeek(r.value);
       }],
       ['checkup', async () => {
-        const r = await L.checkup(courses, await loadIgnored(), s.checksOff);
+        const r = await L.checkup(courses, await loadIgnored(), s.checksOff, all);
         const fix = r.value.filter((i) => i.severity === 'fix');
         summary.checkup = {
           fix: fix.length,
@@ -278,6 +312,8 @@ export class SidebarCard {
   }
 
   private buildShell(scoped: boolean, want: Tab[]): void {
+    // Rebuilding removes the focused button; put focus back on its twin.
+    const had = (this.root.activeElement as HTMLElement | null)?.className;
     clear(this.wrap);
     this.sections.clear();
     const open = h('button', { class: 'open', type: 'button' }, 'Open');
@@ -288,10 +324,14 @@ export class SidebarCard {
       { class: 'hide', type: 'button', 'aria-expanded': String(!collapsed), 'aria-label': collapsed ? 'Show the My Classes summary' : 'Hide the My Classes summary' },
       collapsed ? 'Show' : 'Hide'
     );
-    hide.addEventListener('click', () => {
-      const next = { ...this.opts.settings, cardCollapsed: !collapsed };
+    hide.addEventListener('click', async () => {
+      // Start from the saved settings, not this page's copy, so nothing
+      // changed elsewhere (like "Hide student names") is undone.
+      const fresh = await loadSettings();
+      const next = { ...fresh, cardCollapsed: !collapsed };
       this.opts.settings = next;
-      void this.load().then(() => (this.wrap.querySelector('.hide') as HTMLElement | null)?.focus());
+      await this.load();
+      (this.wrap.querySelector('.hide') as HTMLElement | null)?.focus();
       void saveSettings(next).catch(() => undefined); // every open Canvas tab follows
     });
     this.wrap.append(
@@ -304,6 +344,8 @@ export class SidebarCard {
         open
       )
     );
+    if (had === 'hide') hide.focus();
+    else if (had === 'open') open.focus();
     for (const tab of want) {
       const sec = h('div', { class: 'sec', 'data-sec': tab }, this.sectionHead(tab, null), h('p', { class: 'muted' }, 'Loading…'));
       this.sections.set(tab, sec);

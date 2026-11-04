@@ -167,7 +167,10 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
         queued = false;
         const now = cardSlot(document, kind);
         if (!now) return placeButton();
-        if (!inSlot(c.host, now)) now.parent.insertBefore(c.host, now.before);
+        if (!inSlot(c.host, now)) {
+          now.parent.insertBefore(c.host, now.before);
+          c.refocusAfterMove();
+        }
         placeButton();
       };
       new MutationObserver(() => {
@@ -201,15 +204,10 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
 
   onSettingsChanged((s) => {
     const reload = filterKey(s) !== filterKey(settings) || s.missingThreshold !== settings.missingThreshold;
-    const layout =
-      s.sectionOrder.join(',') !== settings.sectionOrder.join(',') ||
-      s.cardHidden.join(',') !== settings.cardHidden.join(',') ||
-      s.checksOff.join(',') !== settings.checksOff.join(',') ||
-      s.cardCollapsed !== settings.cardCollapsed;
     settings = s;
     panel.updateSettings(s);
     if (reload) clearCardCache();
-    if (card && (reload || layout)) card.updateSettings(s);
+    card?.updateSettings(s); // reloads only if something it shows changed
     if (reload) showCachedBadge();
     placeButton();
   });

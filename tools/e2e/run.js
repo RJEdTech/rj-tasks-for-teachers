@@ -193,6 +193,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       (await page.locator(`${host} >> css=.body .row[data-rule="missing_policy"]`, { hasText: 'ALGEBRA' }).count()) === 0 &&
       (await mp.locator('a', { hasText: 'How to' }).getAttribute('href')) === `${BASE}/courses/5414/pages/setting-up-our-automatic-missing-slash-late-policy-in-canvas`
   );
+  const fetches = JSON.parse(((await (await ctx.request.get(`https://127.0.0.1:${PORT}/__api_count`)).text()) || '').replace(/^while\(1\);/, '')).item_fetches;
+  check('Check-up: a module whose items Canvas left out is fetched on its own', fetches.includes('modules/502/items'), fetches.join(','));
   check(
     'Check-up: modules too big to list inline are fetched (GEOMETRY not flagged; ADVISEMENT with no modules is)',
     (await page.locator(`${host} >> css=.body .row[data-rule="not_in_module"]`, { hasText: 'GEOMETRY' }).count()) === 0 &&
@@ -374,9 +376,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('a check turned off in Settings is left out', (await $('.body .row[data-rule="duplicate_name"]').count()) === 0);
   await page.keyboard.press('Escape');
 
-  await $c('.hide').click();
-  await sleep(300);
+  await $c('.hide').focus();
+  await page.keyboard.press('Enter');
+  await sleep(600);
   check('card Hide: only the title bar stays', (await $c('.sec').count()) === 0 && (await $c('.hide').textContent()) === 'Show');
+  const hideFocus = await page.evaluate(() => {
+    const host = document.querySelector('div[data-rjtt-card]');
+    const a = host && host.shadowRoot && host.shadowRoot.activeElement;
+    return a ? a.className : document.activeElement && document.activeElement.tagName;
+  });
+  check('card Hide: keyboard focus stays on the button', hideFocus === 'hide', hideFocus);
+  const namesStill = await opt.evaluate(() => document.getElementById('hideNames').checked);
+  check('card Hide: other settings are untouched (Hide names still on)', namesStill === true);
+  check('settings page follows the card\'s Hide', await opt.evaluate(() => document.getElementById('cardCollapsed').checked));
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await page.locator(C).waitFor();
   await sleep(500);
