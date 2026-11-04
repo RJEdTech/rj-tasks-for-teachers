@@ -18,6 +18,7 @@ const pkg = require(path.join(root, 'package.json'));
 esbuild.buildSync({
   entryPoints: {
     content: 'src/content.ts',
+    dark: 'src/dark.ts',
     background: 'src/background.ts',
     popup: 'src/pages/popup.ts',
     options: 'src/pages/options.ts',

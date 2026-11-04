@@ -16,6 +16,12 @@
   "content_scripts": [
     {
       "matches": ["https://rjhs.instructure.com/*"],
+      "js": ["dark.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://rjhs.instructure.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle",
       "all_frames": false

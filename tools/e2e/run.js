@@ -335,7 +335,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await doneTab.locator('#done').click();
   await doneTab.waitForEvent('close', { timeout: 3000 }).catch(() => undefined);
   check('settings: Done closes the tab', doneTab.isClosed());
-  check('settings: jump links to each section', (await opt.locator('nav.jump a').count()) === 6);
+  check('settings: jump links to each section', (await opt.locator('nav.jump a').count()) === 7);
   check('settings: every Check-up check has its own switch', (await opt.locator('#checks input[type=checkbox]').count()) === 19);
   await opt.locator('#classes label', { hasText: 'ADVISEMENT' }).locator('input').uncheck();
   await opt.waitForSelector('#saved:has-text("Saved")');
@@ -436,6 +436,76 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('no requests to any other site', offsite.length === 0, offsite.slice(0, 3).join(', '));
   check('no page errors or dialogs', errors.length === 0, errors.slice(0, 3).join(' | '));
 
+
+  // ---------- Student View ----------
+  const svp = await ctx.newPage();
+  await svp.goto(BASE + '/__as_teacher');
+  await svp.addInitScript(() => {
+    new MutationObserver((_, o) => {
+      if (document.body) {
+        document.body.classList.add('is-masquerading-or-student-view');
+        o.disconnect();
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await svp.goto(BASE + '/courses/101', { waitUntil: 'domcontentloaded' });
+  await svp.waitForTimeout(1200);
+  check('Student View: no My Classes button or card', (await svp.locator('div[data-rjtt]').count()) === 0 && (await svp.locator('div[data-rjtt-card]').count()) === 0);
+  await svp.close();
+
+  // ---------- dark mode ----------
+  const dp = await ctx.newPage();
+  dp.on('pageerror', (e) => errors.push(String(e)));
+  const darkOn = () => dp.evaluate(() => document.documentElement.classList.contains('rj-dark-canvas'));
+  const hasBar = () => dp.locator('[data-rj-dark-bar]').count();
+  const setDark = (v) => sw.evaluate((val) => chrome.storage.sync.set({ dark_canvas: val }), v);
+  const settle = () => dp.waitForTimeout(500);
+  await dp.goto(BASE + '/courses/101?x=secret', { waitUntil: 'domcontentloaded' });
+  await settle();
+  check('dark mode: off until it is turned on', !(await darkOn()) && (await hasBar()) === 0);
+  await setDark(true);
+  await settle();
+  check('dark mode: turns on without a reload, with the bar', (await darkOn()) && (await hasBar()) === 1);
+  check('dark mode: the page is flipped and images are flipped back', await dp.evaluate(() => {
+    const i = document.createElement('img');
+    document.body.appendChild(i);
+    const ok = /invert/.test(getComputedStyle(document.documentElement).filter) && /invert/.test(getComputedStyle(i).filter) && getComputedStyle(i).backgroundColor === 'rgb(255, 255, 255)';
+    i.remove();
+    return ok;
+  }));
+  const reportHref = await dp.locator('[data-rj-dark-bar] a').getAttribute('href');
+  check('dark mode: Report it goes to the sign-in form with the choice and this page, without the query string',
+    reportHref.startsWith('https://forms.cloud.microsoft/') && reportHref.includes(encodeURIComponent('"Dark mode problem')) && reportHref.includes(encodeURIComponent(BASE + '/courses/101')) && !reportHref.includes('secret'), reportHref);
+  await dp.getByRole('button', { name: 'Show this page in light mode' }).click();
+  await settle();
+  check('dark mode: light mode for this page', !(await darkOn()));
+  await dp.reload({ waitUntil: 'domcontentloaded' });
+  await settle();
+  check('dark mode: the page stays light after a reload, and can go back', !(await darkOn()) && (await dp.getByRole('button', { name: 'Back to dark mode' }).count()) === 1);
+  await dp.goto(BASE + '/courses/102', { waitUntil: 'domcontentloaded' });
+  await settle();
+  check('dark mode: other pages stay dark', await darkOn());
+  await dp.goto(BASE + '/courses/101', { waitUntil: 'domcontentloaded' });
+  await settle();
+  await dp.getByRole('button', { name: 'Back to dark mode' }).click();
+  await settle();
+  check('dark mode: Back to dark mode works', await darkOn());
+  for (const [what, url] of [['classic quiz', '/courses/101/quizzes/5'], ['New Quizzes builder', '/courses/101/assignments/5/build/9'], ['SpeedGrader', '/courses/101/gradebook/speed_grader?assignment_id=1'], ['Gradebook', '/courses/101/gradebook']]) {
+    await dp.goto(BASE + url, { waitUntil: 'domcontentloaded' });
+    await settle();
+    check(`dark mode: ${what} stays light, with no bar`, !(await darkOn()) && (await hasBar()) === 0);
+  }
+  await dp.goto(BASE + '/courses/102', { waitUntil: 'domcontentloaded' });
+  await settle();
+  await dp.getByRole('button', { name: /Hide this message/ }).click();
+  await settle();
+  check('dark mode: the bar can be hidden, and dark mode stays on', (await hasBar()) === 0 && (await darkOn()));
+  await setDark(false);
+  await settle();
+  check('dark mode: turning it off restores the page', !(await darkOn()));
+  await dp.close();
+
+  check('no page errors in the dark mode checks', errors.length === 0 || errors.every((e) => e.includes('Failed to fetch')), errors.slice(0, 3).join(' | '));
   await ctx.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

@@ -98,6 +98,9 @@ function sendBadge(n: number | null): void {
 
 export async function start(): Promise<{ panel: Panel; card: SidebarCard | null } | null> {
   if (!onAllowedOrigin() || window.top !== window) return null;
+  // Student View (or acting as someone else): this isn't the teacher's own
+  // view, and the floating button would cover Leave Student View.
+  if (document.body.classList.contains('is-masquerading-or-student-view')) return null;
   let settings = await loadSettings();
   try {
     if (!(await teachesSomething(settings))) return null;

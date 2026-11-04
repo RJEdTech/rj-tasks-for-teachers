@@ -2,6 +2,7 @@ import { FEEDBACK_FORM_URL, HOMEPAGE_URL, PD_URL } from '../lib/constants';
 import { RULE_INFO } from '../data/checkup';
 import { loadKnownCourses, loadSettings, onSettingsChanged, saveSettings, Settings, Section, SECTIONS } from '../lib/settings';
 import { h, clear } from '../ui/dom';
+import { DARK_KEY } from '../dark';
 
 let settings: Settings;
 const saved = document.getElementById('saved')!;
@@ -45,6 +46,15 @@ async function init(): Promise<void> {
   const elsewhere = document.getElementById('buttonElsewhere') as HTMLInputElement;
   elsewhere.checked = settings.buttonElsewhere;
   elsewhere.addEventListener('change', () => void save({ ...settings, buttonElsewhere: elsewhere.checked }));
+
+  const dark = document.getElementById('darkCanvas') as HTMLInputElement;
+  chrome.storage.sync.get(DARK_KEY, (r) => (dark.checked = r[DARK_KEY] === true));
+  dark.addEventListener('change', () => {
+    chrome.storage.sync.set({ [DARK_KEY]: dark.checked }, () => {
+      saved.textContent = chrome.runtime.lastError ? "Couldn't save. Try again." : 'Saved.';
+      window.setTimeout(() => (saved.textContent = ''), 2500);
+    });
+  });
 
   renderOrder();
 

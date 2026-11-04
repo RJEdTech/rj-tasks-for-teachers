@@ -27,7 +27,7 @@ if (JSON.stringify(m.permissions) !== '["storage"]') fail(`permissions must be [
 for (const k of ['host_permissions', 'optional_permissions', 'optional_host_permissions', 'web_accessible_resources'])
   if (m[k] && m[k].length) fail(`${k} must be empty`);
 if (m.externally_connectable) fail('externally_connectable must not be set');
-if (!m.content_scripts || m.content_scripts.length !== 1) fail('exactly one content script expected');
+if (!m.content_scripts || m.content_scripts.length !== 2) fail('expected two content scripts: dark.js and content.js');
 for (const cs of m.content_scripts || []) {
   if (JSON.stringify(cs.matches) !== JSON.stringify([`${ORIGIN}/*`])) fail(`content script must match only ${ORIGIN}/*`);
   if (cs.all_frames) fail('content script must not run in iframes');
@@ -66,6 +66,7 @@ for (const f of fs.readdirSync(dir).filter((f) => /\.(js|html)$/.test(f))) {
       continue;
     }
     if (u.hostname === ALLOWED_HOST || BENIGN.has(u.hostname)) continue;
+    // dark.js only holds the Report it link, which opens the form; it is never fetched
     if (OWN_LINKS.has(u.hostname) && f !== 'content.js' && f !== 'background.js') continue;
     fail(`${f}: unexpected URL ${raw.slice(0, 80)}`);
   }

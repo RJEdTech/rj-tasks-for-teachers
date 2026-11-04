@@ -9,7 +9,7 @@
 <header class="mast"><div class="mark" aria-hidden="true">RJ</div><div><h1>RJ Tasks for Teachers</h1><p>Settings</p></div><button type="button" class="done" id="done">Done</button></header>
 <main>
 <p class="help">Changes save automatically, and open Canvas tabs update on their own. There’s no Save button. When you’re finished, click Done or close this tab.</p>
-<nav class="jump" aria-label="Settings sections"><a href="#s-card">My Classes card</a><a href="#s-checkup">Check-up</a><a href="#s-students">Students</a><a href="#s-classes">Classes</a><a href="#s-where">Where it shows up</a><a href="#s-help">Help</a></nav>
+<nav class="jump" aria-label="Settings sections"><a href="#s-card">My Classes card</a><a href="#s-checkup">Check-up</a><a href="#s-students">Students</a><a href="#s-classes">Classes</a><a href="#s-dark">Dark mode</a><a href="#s-where">Where it shows up</a><a href="#s-help">Help</a></nav>
 <p class="saved" id="saved" role="status" aria-live="polite"></p>
 
 <fieldset id="s-card">
@@ -40,6 +40,11 @@
 <label><input type="checkbox" id="semesterOnly"> <span>Only this semester’s classes (recommended)<span class="help block">Your academic classes in the current 1st or 2nd Semester term. PD courses, RaiderQuest, clubs, templates and sandboxes are left out. Uncheck to include every published Canvas course you teach.</span></span></label>
 <p class="help" id="classes-help">Uncheck a class to leave it out too.</p>
 <div id="classes"></div>
+</fieldset>
+
+<fieldset id="s-dark">
+<legend>Dark mode</legend>
+<label><input type="checkbox" id="darkCanvas"> <span>Dark mode for Canvas<span class="help block">Turns Canvas dark and leaves images and videos as they were made. Quizzes, SpeedGrader and the Gradebook stay light. If something is hard to read on a page, use the bar at the bottom to switch that page back to light mode or report it.</span></span></label>
 </fieldset>
 
 <fieldset id="s-where">
