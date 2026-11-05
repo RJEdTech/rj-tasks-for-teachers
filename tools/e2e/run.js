@@ -453,6 +453,32 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Student View: no My Classes button or card', (await svp.locator('div[data-rjtt]').count()) === 0 && (await svp.locator('div[data-rjtt-card]').count()) === 0);
   await svp.close();
 
+  // ---------- Act as User ----------
+  const acp = await ctx.newPage();
+  await acp.goto(BASE + '/__as_teacher');
+  await acp.evaluate(() => sessionStorage.setItem('rjtt-badge-v2', JSON.stringify({ n: 999, t: Date.now(), k: 'sem:' })));
+  await acp.addInitScript(() => {
+    new MutationObserver((_, o) => {
+      if (document.body) {
+        document.body.classList.add('is-masquerading-or-student-view');
+        const a = document.createElement('a');
+        a.href = '/users/1/masquerade'; a.dataset.method = 'post'; a.textContent = 'Stop Acting as User';
+        document.body.appendChild(a);
+        o.disconnect();
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await acp.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await acp.locator('div[data-rjtt-card]').waitFor({ timeout: 8000 });
+  check('Act as User: the card still appears', true);
+  await acp.waitForTimeout(2500);
+  check('Act as User: nothing is saved to this tab', await acp.evaluate(() => JSON.parse(sessionStorage.getItem('rjtt-badge-v2')).n === 999));
+  await acp.goto(BASE + '/courses/102/assignments', { waitUntil: 'domcontentloaded' });
+  await acp.locator('div[data-rjtt] >> css=.launcher').waitFor({ timeout: 8000 });
+  const lb = await acp.locator('div[data-rjtt] >> css=.launcher').evaluate((b) => getComputedStyle(b).bottom);
+  check('Act as User: the button sits above the Stop Acting bar', lb === '76px', lb);
+  await acp.close();
+
   // ---------- dark mode ----------
   const dp = await ctx.newPage();
   dp.on('pageerror', (e) => errors.push(String(e)));
