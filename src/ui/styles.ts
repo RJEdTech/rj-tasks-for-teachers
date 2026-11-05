@@ -4,6 +4,8 @@
   standard: charcoal masthead with a Raider-red rule, 16px body text, 14px
   minimum for secondary text, neutral charcoal dark mode, WCAG AA contrast.
 */
+import { RJ_MARK } from './rjMark';
+
 export const CSS = `
 :host { all: initial; }
 * { box-sizing: border-box; }
@@ -52,7 +54,7 @@ select { background: var(--bg); }
   box-shadow: -8px 0 24px rgba(0,0,0,.18);
 }
 .mast { background: #2a2a2a; color: #fff; border-bottom: 6px solid var(--red); padding: 14px 16px 12px; display: flex; align-items: center; gap: 12px; }
-.mark { width: 34px; height: 34px; border-radius: 6px; background: var(--red); color: #fff; font-weight: 800; font-size: 15px; display: grid; place-items: center; letter-spacing: .02em; flex: none; }
+.mark { width: 34px; height: 40px; background: url(${RJ_MARK}) center / contain no-repeat; font-size: 0; color: transparent; }
 .mast h2 { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.2; }
 .mast .tag { margin: 2px 0 0; color: #b8b8b8; font-size: 13px; text-transform: uppercase; letter-spacing: .12em; }
 .mast .close { margin-left: auto; background: transparent; border: 1px solid #555; color: #fff; border-radius: 6px; width: 36px; height: 36px; cursor: pointer; font-size: 18px; line-height: 1; }

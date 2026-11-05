@@ -45,6 +45,7 @@ for (const f of ['popup.html', 'options.html', 'page.css'])
   fs.copyFileSync(path.join(root, 'src/pages', f), path.join(out, f));
 for (const n of [16, 32, 48, 128])
   fs.copyFileSync(path.join(root, 'src/icons', `icon-${n}.png`), path.join(out, `icon-${n}.png`));
+fs.copyFileSync(path.join(root, 'src/icons/rj-mark.png'), path.join(out, 'rj-mark.png'));
 fs.copyFileSync(path.join(root, 'LICENSE'), path.join(out, 'LICENSE'));
 
 console.log(`Built ${manifest.name} ${manifest.version} -> ${path.basename(out)}/`);
