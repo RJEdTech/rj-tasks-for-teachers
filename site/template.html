@@ -43,7 +43,6 @@
       </div>
       <div class="get">
         <a class="btn" href="#install">Get RJ Tasks for Teachers</a>
-        <a class="btn secondary" href="downloads/{{ZIP}}" download>Download .zip ({{ZIPKB}} KB)</a>
         <small>Version {{VERSION}} · Free for RJ faculty and staff</small>
       </div>
     </div>
@@ -93,87 +92,30 @@
 
         <section id="install" aria-labelledby="install-title">
           <h2 id="install-title">Install</h2>
-          <div class="paths">
-            <div class="path primary">
-              <span class="tag">On an RJ faculty laptop</span>
-              <h3>Nothing to install</h3>
-              <p>Ed Tech turns RJ Tasks for Teachers on for faculty laptops in Microsoft Edge. Once it reaches yours, open your Canvas Dashboard and look for the <strong>My Classes</strong> card at the top of the right sidebar.</p>
-            </div>
-            <div class="path">
-              <span class="tag">Testing it, or on another computer</span>
-              <h3>Install it yourself</h3>
-              <p>Seven steps in Microsoft Edge on Windows or Mac, about three minutes. The orange numbers in each picture match the steps.</p>
-            </div>
-          </div>
-
+          <p>RJ Tasks for Teachers is your choice. Nothing is added to your laptop unless you add it, and you can remove it any time. It takes about a minute, in Microsoft Edge.</p>
           <ol class="steps">
             <li class="step">
               <div class="step-text">
                 <span class="num" aria-hidden="true">1</span>
-                <h3>Download RJ Tasks for Teachers</h3>
-                <p>Save <code>{{ZIP}}</code> to your computer.</p>
-                <a class="btn self-start" href="downloads/{{ZIP}}" download>Download {{ZIP}}</a>
+                <h3>Open the store page</h3>
+                <p>The page won't come up in a store search, so use this link.</p>
+                <a class="btn self-start" href="https://microsoftedge.microsoft.com/addons/detail/flkhcdmbobihocgajkpannbbgodgcedh">Open RJ Tasks for Teachers in the Edge store</a>
               </div>
-              <figure class="ill drawn">{{ILL_DOWNLOAD}}<figcaption>when it finishes, click Show in folder.</figcaption></figure>
             </li>
             <li class="step">
               <div class="step-text">
                 <span class="num" aria-hidden="true">2</span>
-                <h3>Unzip it, and keep the folder</h3>
-                <ul>
-                  <li><strong>Windows:</strong> right-click the file, choose <strong>Extract All…</strong>, then <strong>Extract</strong>.</li>
-                  <li><strong>Mac:</strong> double-click the file.</li>
-                </ul>
-                <p class="tip">Move the new <strong>{{FOLDER}}</strong> folder to <strong>Documents</strong>. Edge runs the extension from this folder, so if it gets deleted, the extension stops working.</p>
+                <h3>Click Get, then Add extension</h3>
+                <p>Edge asks you to confirm. It only asks to work on RJ's Canvas site.</p>
               </div>
-              <figure class="ill drawn">{{ILL_EXTRACT}}<figcaption>File Explorer on Windows.</figcaption></figure>
             </li>
             <li class="step">
               <div class="step-text">
                 <span class="num" aria-hidden="true">3</span>
-                <h3>Open Edge's extensions page</h3>
-                <p>In Microsoft Edge, click the address bar, type this address and press <span class="kbd">Enter</span>. Websites can't link straight to this page, so it has to be typed or pasted.</p>
-                <div class="copyrow">
-                  <input id="edge-url" type="text" value="edge://extensions" readonly aria-label="Edge extensions page address">
-                  <button class="btn secondary" id="copy-btn" type="button">Copy</button>
-                </div>
-                <p class="status" id="copy-status" role="status"></p>
-              </div>
-              <figure class="ill drawn">{{ILL_ADDRESS}}<figcaption>the Edge address bar.</figcaption></figure>
-            </li>
-            <li class="step">
-              <div class="step-text">
-                <span class="num" aria-hidden="true">4</span>
-                <h3>Turn on Developer mode</h3>
-                <p>On the left side of the Extensions page, near the bottom, switch on <strong>Developer mode</strong>. A row of new buttons appears at the top.</p>
-                <p class="tip">If the switch is grey and won't move, your computer is managed by RJ. Skip these steps: the extension will be installed for you.</p>
-              </div>
-              <figure class="ill drawn">{{ILL_DEVMODE}}<figcaption>the Extensions page with Developer mode on.</figcaption></figure>
-            </li>
-            <li class="step">
-              <div class="step-text">
-                <span class="num" aria-hidden="true">5</span>
-                <h3>Load the folder</h3>
-                <p>Click <strong>Load unpacked</strong>. Find the <strong>{{FOLDER}}</strong> folder from step 2 and click <strong>Select Folder</strong>.</p>
-                <p>Pick the folder itself, not the .zip file. Inside it is a file called <code>manifest.json</code>.</p>
-              </div>
-              <figure class="ill drawn">{{ILL_LOAD}}<figcaption>Load unpacked and the folder picker.</figcaption></figure>
-            </li>
-            <li class="step">
-              <div class="step-text">
-                <span class="num" aria-hidden="true">6</span>
-                <h3>Pin it to the toolbar</h3>
-                <p>RJ Tasks for Teachers now appears in your list of extensions with its switch on. To keep its icon next to the address bar, click the puzzle piece, then the eye next to RJ Tasks for Teachers. The icon shows how many assignments have work to grade.</p>
-              </div>
-              <figure class="ill drawn">{{ILL_PIN}}<figcaption>the Extensions menu in the Edge toolbar.</figcaption></figure>
-            </li>
-            <li class="step">
-              <div class="step-text">
-                <span class="num" aria-hidden="true">7</span>
                 <h3>Open Canvas</h3>
-                <p>Go to <a href="https://rjhs.instructure.com">rjhs.instructure.com</a>, or reload Canvas if it's already open. Look for the <strong>My Classes</strong> card at the top of your Dashboard's right sidebar, and on each class's home page. On other pages, use the <strong>My Classes</strong> button in the bottom-right corner.</p>
+                <p>Go to your <a href="https://rjhs.instructure.com">Canvas Dashboard</a>. The <strong>My Classes</strong> card is at the top of the right sidebar. If your Dashboard has no right sidebar, look for the <strong>My Classes</strong> button in the bottom-right corner.</p>
               </div>
-              <figure class="ill"><img src="assets/my-classes-card.webp" width="300" height="612" alt="The My Classes card in Canvas's right sidebar: To grade 15 with the three oldest assignments, Check-up 4 to fix, Students 3 with 3+ missing, and a seven-day Week strip" loading="lazy"><figcaption>The My Classes card, at the top of your Dashboard's right sidebar.</figcaption></figure>
+              <figure class="ill"><img src="assets/my-classes-card.webp" width="300" height="612" alt="The My Classes card in Canvas's right sidebar" loading="lazy"></figure>
             </li>
           </ol>
         </section>
