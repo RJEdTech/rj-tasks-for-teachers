@@ -193,5 +193,6 @@ button { font: inherit; color: inherit; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .foot { margin: 12px 0 0; color: var(--quiet); font-size: 12px; line-height: 15.6px; }
 .foot a { color: var(--link); text-decoration: none; }
-.foot a:hover { text-decoration: underline; }
+.foot a:hover, .setlink:hover { text-decoration: underline; }
+.setlink { padding: 0; border: 0; background: none; color: var(--link); font: inherit; cursor: pointer; }
 `;

@@ -111,7 +111,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Dashboard card: To grade count and oldest-first rows', /To grade\s*15/.test(ct) && (await $c('.list li').count()) === 3, ct.slice(0, 160));
   check('Dashboard card: rows link to SpeedGrader', (await $c('.list a').first().getAttribute('href')) === `${BASE}/courses/101/gradebook/speed_grader?assignment_id=1001`);
   check('Dashboard card: Check-up summary', /\d+ to fix · \d+ worth a look/.test(ct), ct);
-  check('Dashboard card: "Questions?" links to the Canvas PD course', (await $c('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
+  check('Dashboard card: "Questions?" links to the Canvas PD course', (await $c('.foot .setlink').count()) === 1 && (await $c('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
   check('Dashboard card: Students as a count only, never names', /3 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|img/.test(ct), ct);
   check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /assignments? due in the next 7 days/.test(ct));
   check('Dashboard card: only this semester\'s classes', !/EDTECH|RAIDERQUEST|DEMO|THEOLOGY 1 S2/.test(ct));
@@ -470,7 +470,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ---------- Act as User ----------
   const acp = await ctx.newPage();
   await acp.goto(BASE + '/__as_teacher');
-  await acp.evaluate(() => sessionStorage.setItem('rjtt-badge-v2', JSON.stringify({ n: 999, t: Date.now(), k: 'sem:' })));
+  await acp.waitForTimeout(800);
+  const keysBefore = await acp.evaluate(() => Object.keys(sessionStorage).sort().join());
   await acp.addInitScript(() => {
     new MutationObserver((_, o) => {
       if (document.body) {
@@ -486,7 +487,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await acp.locator('div[data-rjtt-card]').waitFor({ timeout: 8000 });
   check('Act as User: the card still appears', true);
   await acp.waitForTimeout(2500);
-  check('Act as User: nothing is saved to this tab', await acp.evaluate(() => Object.keys(sessionStorage).every((k) => k === 'rjtt-badge-v2')));
+  check('Act as User: nothing is saved to this tab', (await acp.evaluate(() => Object.keys(sessionStorage).sort().join())) === keysBefore);
   await acp.goto(BASE + '/courses/102/assignments', { waitUntil: 'domcontentloaded' });
   await acp.locator('div[data-rjtt] >> css=.launcher').waitFor({ timeout: 8000 });
   const lb = await acp.locator('div[data-rjtt] >> css=.launcher').evaluate((b) => getComputedStyle(b).bottom);

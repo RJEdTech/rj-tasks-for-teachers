@@ -122,6 +122,7 @@ export function clearCardCache(): void {
 }
 
 export interface CardOptions {
+  onSettings: () => void;
   loader: Loader;
   settings: Settings;
   /* null on the Dashboard (all classes); a course id on that course's home page */
@@ -356,12 +357,16 @@ export class SidebarCard {
       this.wrap.append(sec);
     }
     if (want.length)
+      const settingsLink = h('button', { class: 'setlink', type: 'button' }, 'Settings');
+      settingsLink.addEventListener('click', () => this.opts.onSettings());
       this.wrap.append(
         h(
           'p',
           { class: 'foot' },
           'Questions? ',
-          h('a', { href: canvasLink(PD_COURSE_PATH, {}), target: '_blank', rel: 'noopener' }, 'Canvas PD course')
+          h('a', { href: canvasLink(PD_COURSE_PATH, {}), target: '_blank', rel: 'noopener' }, 'Canvas PD course'),
+          ' · ',
+          settingsLink
         )
       );
   }

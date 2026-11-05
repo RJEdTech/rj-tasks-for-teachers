@@ -163,6 +163,13 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
         settings,
         courseId: kind === 'course' ? courseId : null,
         onOpen: (tab) => void panel.openAt(tab, kind === 'course' ? courseId! : 'all'),
+        onSettings: () => {
+          try {
+            void chrome.runtime.sendMessage({ type: 'open-settings' }).catch(() => undefined);
+          } catch {
+            /* ignore */
+          }
+        },
         onGradeCount: kind === 'dashboard' ? (n) => setBadge(n) : undefined,
       });
       card = c;
