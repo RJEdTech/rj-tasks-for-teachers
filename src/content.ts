@@ -12,6 +12,7 @@ import { isShownCourse } from './data/courses';
 import { Loader } from './data/loader';
 import { loadSettings, onSettingsChanged, Settings } from './lib/settings';
 import { Panel } from './ui/panel';
+import { isActingAs, isStudentView } from './lib/acting';
 import { SidebarCard, cardSlot, inSlot, isShown, clearCardCache, moveTodoUp } from './ui/card';
 
 const ROLE_KEY = 'rjtt-teaches-v2'; // sessionStorage: {v: 0|1, t} per filter, this tab only
@@ -36,7 +37,10 @@ export function cardKind(path: string): 'dashboard' | 'course' | null {
   return null;
 }
 
+/* While acting as someone, nothing is cached: their numbers must never show
+   up as yours after you stop. */
 function readSession(key: string): string | null {
+  if (isActingAs()) return null;
   try {
     return window.sessionStorage.getItem(key);
   } catch {
@@ -45,6 +49,7 @@ function readSession(key: string): string | null {
 }
 
 function writeSession(key: string, value: string): void {
+  if (isActingAs()) return;
   try {
     window.sessionStorage.setItem(key, value);
   } catch {
@@ -98,9 +103,8 @@ function sendBadge(n: number | null): void {
 
 export async function start(): Promise<{ panel: Panel; card: SidebarCard | null } | null> {
   if (!onAllowedOrigin() || window.top !== window) return null;
-  // Student View (or acting as someone else): this isn't the teacher's own
-  // view, and the floating button would cover Leave Student View.
-  if (document.body.classList.contains('is-masquerading-or-student-view')) return null;
+  // Student View isn't a teacher's view, and the button would cover Leave Student View.
+  if (isStudentView()) return null;
   let settings = await loadSettings();
   try {
     if (!(await teachesSomething(settings))) return null;

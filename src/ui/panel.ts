@@ -3,6 +3,7 @@
   Canvas's page scripts and styles can't reach inside it, and it can't
   restyle Canvas.
 */
+import { isActingAs } from '../lib/acting';
 import { PD_COURSE_PATH, PRODUCT_NAME } from '../lib/constants';
 import { canvasLink } from '../lib/canvasApi';
 import { TeacherCourse } from '../lib/types';
@@ -82,6 +83,7 @@ export class Panel {
       this.badge
     ) as HTMLButtonElement;
     this.launcher.hidden = !opts.showButton;
+    if (isActingAs()) this.launcher.style.bottom = '76px'; // stay above "Stop Acting as User"
     this.launcher.addEventListener('click', () => this.toggle());
     this.wrap.appendChild(this.launcher);
 

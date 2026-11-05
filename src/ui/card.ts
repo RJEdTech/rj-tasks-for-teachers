@@ -13,6 +13,7 @@
   to the Dashboard doesn't ask Canvas for everything again. Sections load one
   after another, not all at once, and Students (the heaviest) goes last.
 */
+import { isActingAs } from '../lib/acting';
 import { canvasLink } from '../lib/canvasApi';
 import { PD_COURSE_PATH } from '../lib/constants';
 import { Settings, loadIgnored, loadSettings, saveSettings } from '../lib/settings';
@@ -84,6 +85,7 @@ export function summarizeWeek(days: WeekDay[]): WeekSummary {
 }
 
 function readCache(key: string, want: Tab[]): CardSummary | null {
+  if (isActingAs()) return null;
   try {
     const raw = window.sessionStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
@@ -98,6 +100,7 @@ function readCache(key: string, want: Tab[]): CardSummary | null {
 }
 
 function writeCache(key: string, s: CardSummary): void {
+  if (isActingAs()) return;
   try {
     window.sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ t: Date.now(), s }));
   } catch {
