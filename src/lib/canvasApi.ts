@@ -15,6 +15,8 @@ import { ALLOWED_ORIGINS } from './constants';
 const ID = '\\d{1,20}';
 const ENDPOINTS: RegExp[] = [
   /^\/api\/v1\/courses$/,
+  // 1.2.1: whose session this is, so saved summaries stay with their owner
+  /^\/api\/v1\/users\/self$/,
   new RegExp(`^/api/v1/courses/${ID}/assignments$`),
   new RegExp(`^/api/v1/courses/${ID}/assignment_groups$`),
   new RegExp(`^/api/v1/courses/${ID}/students/submissions$`),

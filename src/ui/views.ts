@@ -225,8 +225,8 @@ export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLE
     h(
       'p',
       { class: 'summary' },
-      `${plural(total, 'item')} due from your classes in the next 7 days.` +
-        (flagged ? ` ${plural(flagged, 'day')} with ${HEAVY_DAY} or more graded items for the same class.` : '')
+      `${plural(total, 'assignment')} due from your classes in the next 7 days.` +
+        (flagged ? ` ${plural(flagged, 'day')} with ${HEAVY_DAY} or more graded assignments for the same class.` : '')
     )
   );
   days.forEach((d, idx) => {
@@ -234,14 +234,14 @@ export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLE
     const day = h(
       'div',
       { class: 'day' },
-      h('h4', {}, label, ' ', h('span', { class: 'muted' }, `${formatDay(d.date)} · ${plural(d.items.length, 'item')}`))
+      h('h4', {}, label, ' ', h('span', { class: 'muted' }, `${formatDay(d.date)} · ${plural(d.items.length, 'assignment')}`))
     );
     for (const f of d.flags)
       day.append(
         h(
           'div',
           { class: 'flag' },
-          `${f.forWhom ?? f.course.code}: ${f.count} graded items due this day`
+          `${f.forWhom ?? f.course.code}: ${f.count} graded assignments due this day`
         )
       );
     for (const it of d.items)

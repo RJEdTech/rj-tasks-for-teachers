@@ -282,6 +282,9 @@ class Handler(BaseHTTPRequestHandler):
             API_COUNT[0] += 1
         if p == "/api/v1/courses":
             return self.json(courses(self.as_student()))
+        if p == "/api/v1/users/self":
+            cookie = self.headers.get("Cookie") or ""
+            return self.json({"id": "2" if "uid=2" in cookie else "1", "name": "Sample Teacher"})
         if p == "/api/v1/users/self/todo_item_count":
             return self.json({"needs_grading_count": 0 if self.as_student() else 4, "assignments_needing_submitting": 0})
         parts = p.split("/")

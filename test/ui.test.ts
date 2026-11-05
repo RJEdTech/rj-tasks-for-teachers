@@ -104,7 +104,7 @@ describe('views', () => {
     const el = weekView(days, true, NOW);
     expect(el.querySelectorAll('.day')).toHaveLength(7);
     expect(el.textContent).toContain('Tomorrow');
-    expect(el.textContent).toContain('ALGEBRA 1: 3 graded items due this day');
+    expect(el.textContent).toContain('ALGEBRA 1: 3 graded assignments due this day');
     expect(el.textContent).toContain("Canvas doesn't let teachers see");
   });
 });

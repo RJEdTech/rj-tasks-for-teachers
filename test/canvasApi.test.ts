@@ -41,7 +41,7 @@ describe('resolveApiUrl', () => {
       '/api/v1/users/self/profile',
       '/api/v1/users/self/todo_item_count', // dropped in 1.1: the badge uses the To grade count
       '/api/v1/courses/abc/assignments',
-      '/api/v1/courses/1/../../users/self',
+      '/api/v1/courses/1/../../accounts/1',
       '/login',
       'https://evil.example/api/v1/courses',
       '//evil.example/api/v1/courses',

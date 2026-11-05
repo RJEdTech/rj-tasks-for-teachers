@@ -12,7 +12,7 @@ import { isShownCourse } from './data/courses';
 import { Loader } from './data/loader';
 import { loadSettings, onSettingsChanged, Settings } from './lib/settings';
 import { Panel } from './ui/panel';
-import { isActingAs, isStudentView } from './lib/acting';
+import { isStudentView, loadOwner, ownedKey } from './lib/acting';
 import { SidebarCard, cardSlot, inSlot, isShown, clearCardCache, moveTodoUp } from './ui/card';
 
 const ROLE_KEY = 'rjtt-teaches-v2'; // sessionStorage: {v: 0|1, t} per filter, this tab only
@@ -37,21 +37,23 @@ export function cardKind(path: string): 'dashboard' | 'course' | null {
   return null;
 }
 
-/* While acting as someone, nothing is cached: their numbers must never show
-   up as yours after you stop. */
+/* Saved numbers stay with the user they belong to: one person's must never
+   show up as another's. */
 function readSession(key: string): string | null {
-  if (isActingAs()) return null;
+  const k = ownedKey(key);
+  if (!k) return null;
   try {
-    return window.sessionStorage.getItem(key);
+    return window.sessionStorage.getItem(k);
   } catch {
     return null;
   }
 }
 
 function writeSession(key: string, value: string): void {
-  if (isActingAs()) return;
+  const k = ownedKey(key);
+  if (!k) return;
   try {
-    window.sessionStorage.setItem(key, value);
+    window.sessionStorage.setItem(k, value);
   } catch {
     /* storage blocked: just ask Canvas again next time */
   }
@@ -105,6 +107,7 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
   if (!onAllowedOrigin() || window.top !== window) return null;
   // Student View isn't a teacher's view, and the button would cover Leave Student View.
   if (isStudentView()) return null;
+  await loadOwner();
   let settings = await loadSettings();
   try {
     if (!(await teachesSomething(settings))) return null;

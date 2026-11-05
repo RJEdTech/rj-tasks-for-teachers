@@ -9,7 +9,7 @@ RJ Tasks for Teachers runs inside a teacher's Canvas session, which can see stud
 | Browser permissions | `storage` only. No host permissions, tabs, cookies, scripting or web requests. | `manifest.json`, `check-build.js` |
 | Where it runs | `https://rjhs.instructure.com/*`, top frame only, not in iframes or about:blank. | manifest, `check-build.js`, `onAllowedOrigin()` |
 | Network | `fetch` from the content script only, same-origin, `GET` only, `redirect: 'error'`, `cache: 'no-store'`. | `canvasApi.ts`, `check-build.js` (no other file may fetch; no non-GET method strings) |
-| Canvas endpoints | `courses`, `courses/:id/assignments`, `assignment_groups`, `students/submissions`, `grading_periods`, `users`, and (1.1, for Check-up's RJ Baseline checks) `modules`, `modules/:id/items`, `late_policy`. All GET. Pagination links are re-checked. Ids must be digits. | `canvasApi.ts` `ENDPOINTS`, `assertId` |
+| Canvas endpoints | `courses`, `courses/:id/assignments`, `assignment_groups`, `students/submissions`, `grading_periods`, `users`, `users/self` (only to keep saved summaries with their owner), and (1.1, for Check-up's RJ Baseline checks) `modules`, `modules/:id/items`, `late_policy`. All GET. Pagination links are re-checked. Ids must be digits. | `canvasApi.ts` `ENDPOINTS`, `assertId` |
 | Writing to Canvas | **None.** There is no write function in the codebase. | code, `check-build.js`, e2e (server and browser both record 0 non-GET requests) |
 | Links it renders | Same-origin RJ Canvas links only, built from digit ids. | `canvasLink()`, `safeLink()` |
 

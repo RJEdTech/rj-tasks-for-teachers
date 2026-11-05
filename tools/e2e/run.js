@@ -113,7 +113,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Dashboard card: Check-up summary', /\d+ to fix · \d+ worth a look/.test(ct), ct);
   check('Dashboard card: "Questions?" links to the Canvas PD course', (await $c('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
   check('Dashboard card: Students as a count only, never names', /3 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|img/.test(ct), ct);
-  check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /items? due in the next 7 days/.test(ct));
+  check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /assignments? due in the next 7 days/.test(ct));
   check('Dashboard card: only this semester\'s classes', !/EDTECH|RAIDERQUEST|DEMO|THEOLOGY 1 S2/.test(ct));
   check('Dashboard: no floating button while the card is showing', !(await $('.launcher').isVisible()));
   await page.waitForFunction(() => {
@@ -453,6 +453,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Student View: no My Classes button or card', (await svp.locator('div[data-rjtt]').count()) === 0 && (await svp.locator('div[data-rjtt-card]').count()) === 0);
   await svp.close();
 
+  // ---------- saved numbers stay with their owner ----------
+  const own = await ctx.newPage();
+  await own.goto(BASE + '/__as_teacher');
+  await own.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await own.locator('div[data-rjtt-card]').waitFor();
+  await own.waitForFunction(() => Object.keys(sessionStorage).some((k) => k.startsWith('rjtt-card-v1:') && k.endsWith('@1')), null, { timeout: 8000 });
+  await ctx.addCookies([{ name: 'uid', value: '2', domain: 'rjhs.instructure.com', path: '/', secure: true }]);
+  await own.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await own.locator('div[data-rjtt-card]').waitFor();
+  await own.waitForFunction(() => Object.keys(sessionStorage).some((k) => k.startsWith('rjtt-card-v1:') && k.endsWith('@2')), null, { timeout: 8000 }).catch(() => undefined);
+  check("a different Canvas user does not reuse this tab's saved numbers", await own.evaluate(() => Object.keys(sessionStorage).some((k) => k.endsWith('@2'))));
+  await ctx.clearCookies({ name: 'uid' });
+  await own.close();
+
   // ---------- Act as User ----------
   const acp = await ctx.newPage();
   await acp.goto(BASE + '/__as_teacher');
@@ -472,7 +486,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await acp.locator('div[data-rjtt-card]').waitFor({ timeout: 8000 });
   check('Act as User: the card still appears', true);
   await acp.waitForTimeout(2500);
-  check('Act as User: nothing is saved to this tab', await acp.evaluate(() => JSON.parse(sessionStorage.getItem('rjtt-badge-v2')).n === 999));
+  check('Act as User: nothing is saved to this tab', await acp.evaluate(() => Object.keys(sessionStorage).every((k) => k === 'rjtt-badge-v2')));
   await acp.goto(BASE + '/courses/102/assignments', { waitUntil: 'domcontentloaded' });
   await acp.locator('div[data-rjtt] >> css=.launcher').waitFor({ timeout: 8000 });
   const lb = await acp.locator('div[data-rjtt] >> css=.launcher').evaluate((b) => getComputedStyle(b).bottom);

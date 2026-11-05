@@ -28,7 +28,7 @@ The card and button only appear for people who teach or TA a class this semester
 See [SECURITY.md](SECURITY.md). In short:
 
 - The only browser permission is `storage`. The content script runs on `https://rjhs.instructure.com/*` only, top frame only.
-- **GET only.** `src/lib/canvasApi.ts` is the only code that touches the network. It can send only GET requests, and only to seven listed Canvas API endpoints.
+- **GET only.** `src/lib/canvasApi.ts` is the only code that touches the network. It can send only GET requests, and only to a short list of Canvas API endpoints.
 - The panel lives in a **closed shadow root** and is built only from text nodes, so a student name or assignment title can never run as code.
 - No third-party runtime code at all, no remote code, no analytics. Nothing about students is written to storage.
 - `tools/check-build.js` fails the build if any of this regresses.

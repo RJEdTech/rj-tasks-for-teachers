@@ -13,7 +13,7 @@
   to the Dashboard doesn't ask Canvas for everything again. Sections load one
   after another, not all at once, and Students (the heaviest) goes last.
 */
-import { isActingAs } from '../lib/acting';
+import { ownedKey } from '../lib/acting';
 import { canvasLink } from '../lib/canvasApi';
 import { PD_COURSE_PATH } from '../lib/constants';
 import { Settings, loadIgnored, loadSettings, saveSettings } from '../lib/settings';
@@ -85,9 +85,10 @@ export function summarizeWeek(days: WeekDay[]): WeekSummary {
 }
 
 function readCache(key: string, want: Tab[]): CardSummary | null {
-  if (isActingAs()) return null;
+  const k = ownedKey(CACHE_PREFIX + key);
+  if (!k) return null;
   try {
-    const raw = window.sessionStorage.getItem(CACHE_PREFIX + key);
+    const raw = window.sessionStorage.getItem(k);
     if (!raw) return null;
     const v = JSON.parse(raw) as { t?: unknown; s?: unknown };
     if (typeof v.t !== 'number' || Date.now() - v.t > CACHE_TTL_MS || !v.s || typeof v.s !== 'object') return null;
@@ -100,9 +101,10 @@ function readCache(key: string, want: Tab[]): CardSummary | null {
 }
 
 function writeCache(key: string, s: CardSummary): void {
-  if (isActingAs()) return;
+  const k = ownedKey(CACHE_PREFIX + key);
+  if (!k) return;
   try {
-    window.sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ t: Date.now(), s }));
+    window.sessionStorage.setItem(k, JSON.stringify({ t: Date.now(), s }));
   } catch {
     /* storage full or blocked: just load again next time */
   }
@@ -236,7 +238,7 @@ export class SidebarCard {
     this.buildShell(scoped, this.opts.settings.cardCollapsed ? [] : want);
     if (this.opts.settings.cardCollapsed) return; // hidden: header only, nothing loaded
     if (!want.length) {
-      this.message('All sections are turned off in RJ Tasks settings. Click Open for the full view.');
+      this.message('All sections are turned off in RJ Tasks settings. Click Full view to see everything.');
       return;
     }
 
@@ -319,7 +321,7 @@ export class SidebarCard {
     const had = (this.root.activeElement as HTMLElement | null)?.className;
     clear(this.wrap);
     this.sections.clear();
-    const open = h('button', { class: 'open', type: 'button' }, 'Open');
+    const open = h('button', { class: 'open', type: 'button' }, 'Full view');
     open.addEventListener('click', () => this.open(this.shown()[0] ?? this.opts.settings.sectionOrder[0]));
     const collapsed = this.opts.settings.cardCollapsed;
     const hide = h(
@@ -468,17 +470,17 @@ export class SidebarCard {
           'li',
           {
             class: d.flagged ? 'flag' : d.n ? 'some' : '',
-            title: `${name}: ${plural(d.n, 'item')}${d.flagged ? ', 3+ graded items for one class' : ''}`,
+            title: `${name}: ${plural(d.n, 'assignment')}${d.flagged ? ', 3+ graded assignments for one class' : ''}`,
           },
           h('span', { class: 'd', 'aria-hidden': 'true' }, i === 0 ? 'Today' : DAY_LETTER.format(date)),
           h('span', { class: 'n', 'aria-hidden': 'true' }, String(d.n)),
-          h('span', { class: 'sr' }, `${name}, ${plural(d.n, 'item')}${d.flagged ? ', heavy day' : ''}`)
+          h('span', { class: 'sr' }, `${name}, ${plural(d.n, 'assignment')}${d.flagged ? ', heavy day' : ''}`)
         )
       );
     });
     box.append(strip);
     const heavy = w.days.filter((d) => d.flagged).length;
-    box.append(h('p', { class: 'small' }, `${plural(w.total, 'item')} due in the next 7 days${heavy ? ` · ${plural(heavy, 'heavy day')}` : ''}`));
+    box.append(h('p', { class: 'small' }, `${plural(w.total, 'assignment')} due in the next 7 days${heavy ? ` · ${plural(heavy, 'heavy day')}` : ''}`));
     return box;
   }
 }
