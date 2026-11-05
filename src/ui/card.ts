@@ -356,9 +356,9 @@ export class SidebarCard {
       this.sections.set(tab, sec);
       this.wrap.append(sec);
     }
+    const settingsLink = h('button', { class: 'setlink', type: 'button' }, 'Settings');
+    settingsLink.addEventListener('click', () => this.opts.onSettings());
     if (want.length)
-      const settingsLink = h('button', { class: 'setlink', type: 'button' }, 'Settings');
-      settingsLink.addEventListener('click', () => this.opts.onSettings());
       this.wrap.append(
         h(
           'p',
