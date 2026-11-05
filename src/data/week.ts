@@ -1,7 +1,8 @@
 /*
   Your week: what's due from your classes each of the next 7 days, and a flag
-  when one class (or one section, if dates are set per section) has two or
-  more graded items due the same day.
+  when one class (or one section, if dates are set per section) has HEAVY_DAY
+  or more graded items due the same day. Two in a day is ordinary homework at
+  RJ: every teacher we checked had two "heavy" days a week at that bar.
 
   Teachers can only see the courses they teach, so this can't show what
   students have due in other classes.
@@ -35,6 +36,8 @@ export interface WeekDay {
   items: WeekItem[];
   flags: WeekFlag[];
 }
+
+export const HEAVY_DAY = 3;
 
 export function buildWeek(
   data: Array<{ course: TeacherCourse; assignments: CanvasAssignment[] }>,
@@ -100,7 +103,7 @@ export function whoFor(d: AssignmentDate): { scope: WeekItem['scope']; forWhom: 
   return { scope: 'all', forWhom: null };
 }
 
-/* A day is flagged when one class has 2+ graded items due for everyone, or
+/* A day is flagged when one class has 3+ graded items due for everyone, or
    when a section's own dates plus the whole-class dates reach 2. Dates for a
    few students (extensions) never count. */
 export function flagsFor(items: WeekItem[]): WeekFlag[] {
@@ -115,10 +118,10 @@ export function flagsFor(items: WeekItem[]): WeekFlag[] {
   for (const list of byCourse.values()) {
     const course = list[0].course;
     const everyone = list.filter((i) => i.scope === 'all').length;
-    if (everyone >= 2) flags.push({ course, forWhom: null, count: everyone });
+    if (everyone >= HEAVY_DAY) flags.push({ course, forWhom: null, count: everyone });
     const sections = new Map<string, number>();
     for (const i of list) if (i.scope === 'section' && i.forWhom) sections.set(i.forWhom, (sections.get(i.forWhom) ?? 0) + 1);
-    for (const [name, n] of sections) if (everyone + n >= 2) flags.push({ course, forWhom: name, count: everyone + n });
+    for (const [name, n] of sections) if (everyone + n >= HEAVY_DAY) flags.push({ course, forWhom: name, count: everyone + n });
   }
   return flags;
 }

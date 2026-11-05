@@ -418,7 +418,7 @@ describe('students to check on', () => {
 });
 
 describe('your week', () => {
-  it('lists the next 7 days and flags 2+ graded items for one class or section on a day', () => {
+  it('lists the next 7 days and flags 3+ graded items for one class on a day, not 2', () => {
     const days = buildWeek(
       [
         {
@@ -426,6 +426,7 @@ describe('your week', () => {
           assignments: [
             a({ id: '1', name: 'Quiz', due_at: at(23, 8, 0) }),
             a({ id: '2', name: 'HW', due_at: at(23) }),
+            a({ id: '9', name: 'Reading', due_at: at(23) }),
             a({ id: '3', name: 'Practice', due_at: at(23), grading_type: 'not_graded' }),
             a({ id: '4', name: 'Hidden', due_at: at(23), published: false }),
             a({ id: '5', name: 'Too far', due_at: at(30) }),
@@ -445,13 +446,13 @@ describe('your week', () => {
     expect(days).toHaveLength(7);
     expect(days[0].key).toBe('2026-10-22');
     const fri = days[1];
-    expect(fri.items.map((i) => i.name)).toEqual(['Quiz', 'HW', 'Practice']);
-    expect(fri.flags).toEqual([{ course: ALG, forWhom: null, count: 2 }]);
+    expect(fri.items.map((i) => i.name)).toEqual(['Quiz', 'HW', 'Practice', 'Reading']);
+    expect(fri.flags).toEqual([{ course: ALG, forWhom: null, count: 3 }]);
     const sat = days[2];
     expect(sat.items.map((i) => i.name)).toEqual(['Lab']);
     const mon = days[4];
     expect(mon.items.map((i) => `${i.name}/${i.forWhom}`)).toEqual(['Lab/Period 3', 'Test/Period 3']);
-    expect(mon.flags).toEqual([{ course: GEO, forWhom: 'Period 3', count: 2 }]);
+    expect(mon.flags).toEqual([]); // two is ordinary homework
   });
 
   it('counts whole-class dates toward a section, and never counts individual extensions', () => {
@@ -461,6 +462,7 @@ describe('your week', () => {
           course: GEO,
           assignments: [
             a({ id: '1', name: 'Quiz', due_at: at(23) }),
+            a({ id: '5', name: 'HW', due_at: at(23) }),
             a({ id: '2', name: 'Test', due_at: null, all_dates: [{ title: 'Period 5', set_type: 'CourseSection', due_at: at(23) }] }),
             a({ id: '3', name: 'Lab', due_at: at(28), all_dates: [{ base: true, due_at: at(28) }, { title: '1 student', set_type: 'ADHOC', due_at: at(23) }] }),
             a({ id: '4', name: 'Essay', due_at: at(28), all_dates: [{ base: true, due_at: at(28) }, { title: '2 students', due_at: at(23) }] }),
@@ -470,8 +472,8 @@ describe('your week', () => {
       NOW
     );
     const fri = days[1];
-    expect(fri.items.map((i) => `${i.name}/${i.scope}`).sort()).toEqual(['Essay/some', 'Lab/some', 'Quiz/all', 'Test/section']);
-    expect(fri.flags).toEqual([{ course: GEO, forWhom: 'Period 5', count: 2 }]);
+    expect(fri.items.map((i) => `${i.name}/${i.scope}`).sort()).toEqual(['Essay/some', 'HW/all', 'Lab/some', 'Quiz/all', 'Test/section']);
+    expect(fri.flags).toEqual([{ course: GEO, forWhom: null, count: 2 }, { course: GEO, forWhom: 'Period 5', count: 3 }].filter((f) => f.count >= 3));
   });
 });
 

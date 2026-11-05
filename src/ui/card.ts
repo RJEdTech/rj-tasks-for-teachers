@@ -468,7 +468,7 @@ export class SidebarCard {
           'li',
           {
             class: d.flagged ? 'flag' : d.n ? 'some' : '',
-            title: `${name}: ${plural(d.n, 'item')}${d.flagged ? ', 2+ graded items for one class' : ''}`,
+            title: `${name}: ${plural(d.n, 'item')}${d.flagged ? ', 3+ graded items for one class' : ''}`,
           },
           h('span', { class: 'd', 'aria-hidden': 'true' }, i === 0 ? 'Today' : DAY_LETTER.format(date)),
           h('span', { class: 'n', 'aria-hidden': 'true' }, String(d.n)),

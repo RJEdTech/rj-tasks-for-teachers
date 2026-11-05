@@ -35,7 +35,6 @@ html.${CLASS_NAME} img.equation_image { filter: none !important; background: tra
 html.${CLASS_NAME} #header, html.${CLASS_NAME} .ic-app-header, html.${CLASS_NAME} .ic-DashboardCard__header_image,
 html.${CLASS_NAME} [data-rj-dark-bar] { filter: ${FLIP_BACK} !important; }
 html.${CLASS_NAME} #header img, html.${CLASS_NAME} .ic-app-header img { filter: none !important; background: transparent !important; }
-@media (prefers-color-scheme: dark) { html.${CLASS_NAME} div[data-rjtt] { filter: ${FLIP_BACK} !important; } }
 }`;
 
 const BAR_CSS = `

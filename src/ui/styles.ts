@@ -22,6 +22,14 @@ export const CSS = `
   }
 }
 button, select { font: inherit; color: inherit; }
+select { background: var(--bg); }
+/* Canvas dark mode flips the whole page. A panel already in dark colors flips
+   back on itself. The filter can't go on the host: that would trap these
+   fixed elements inside a zero-height box, off the screen. */
+@media (prefers-color-scheme: dark) {
+  :host-context(html.rj-dark-canvas) .launcher,
+  :host-context(html.rj-dark-canvas) .panel { filter: invert(1) hue-rotate(180deg); }
+}
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 .launcher {

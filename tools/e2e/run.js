@@ -207,7 +207,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.screenshot({ path: path.join(OUT, '2-check-up.png') });
   await $('.body .row[data-rule="zero_points"] button').click();
   t = await waitBody(/ignored/);
-  check('Check-up: Ignore hides an item and offers to show it again', !/Warm-up log/.test(t) && /1 item ignored/.test(t));
+  check('Check-up: Ignore hides an item and offers to show it again', (await $('.body .row[data-rule="zero_points"]').count()) === 0 && /1 item ignored/.test(t));
 
   // ---------- Students ----------
   await tab('students');
@@ -255,8 +255,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Week: 7 days listed', (await $('.body .day').count()) === 7);
   const flags = await $('.body .flag').allTextContents();
   check(
-    'Week: flags 2+ graded items for one class / one section',
-    flags.length === 2 && /ALGEBRA 1: 2 graded/.test(flags[0]) && /GEOMETRY · Period 3: 2 graded/.test(flags[1]),
+    'Week: two graded items in a day is not flagged',
+    flags.length === 0,
     flags.join(' | ')
   );
   check('Week: unpublished and ungraded items do not add to flags', !/Unit 3 Test/.test(t));
@@ -529,6 +529,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await setDark(false);
   await settle();
   check('dark mode: turning it off restores the page', !(await darkOn()));
+  // Windows set to dark AND Canvas dark mode: the panel must still open on screen.
+  await dp.emulateMedia({ colorScheme: 'dark' });
+  await setDark(true);
+  await dp.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await dp.locator('div[data-rjtt-card] >> css=.open').click();
+  await dp.locator('div[data-rjtt] >> css=.panel').waitFor();
+  await dp.waitForTimeout(400);
+  const box = await dp.locator('div[data-rjtt] >> css=.panel').boundingBox();
+  const vp = dp.viewportSize();
+  check('dark mode + dark Windows: the panel opens on screen', !!box && box.y === 0 && box.height === vp.height && box.x + box.width === vp.width, JSON.stringify(box));
+  check('dark mode + dark Windows: the page does not jump', (await dp.evaluate(() => window.scrollY)) === 0);
+  await dp.keyboard.press('Escape');
+  await dp.emulateMedia({ colorScheme: 'light' });
+  await setDark(false);
   await dp.close();
 
   check('no page errors in the dark mode checks', errors.length === 0 || errors.every((e) => e.includes('Failed to fetch')), errors.slice(0, 3).join(' | '));

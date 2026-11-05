@@ -5,7 +5,7 @@ import { formatDay, formatDayTime, waitingFor, daysBetween } from '../lib/dates'
 import { GradingRow } from '../data/grading';
 import { Issue } from '../data/checkup';
 import { StudentRow } from '../data/students';
-import { ForecastDay, WeekDay } from '../data/week';
+import { ForecastDay, HEAVY_DAY, WeekDay } from '../data/week';
 import { TeacherCourse } from '../lib/types';
 import { h, plural } from './dom';
 
@@ -226,7 +226,7 @@ export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLE
       'p',
       { class: 'summary' },
       `${plural(total, 'item')} due from your classes in the next 7 days.` +
-        (flagged ? ` ${plural(flagged, 'day')} with 2 or more graded items for the same class.` : '')
+        (flagged ? ` ${plural(flagged, 'day')} with ${HEAVY_DAY} or more graded items for the same class.` : '')
     )
   );
   days.forEach((d, idx) => {
@@ -241,7 +241,7 @@ export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLE
         h(
           'div',
           { class: 'flag' },
-          `${f.course.code}${f.forWhom ? ` · ${f.forWhom}` : ''}: ${f.count} graded items due this day`
+          `${f.forWhom ?? f.course.code}: ${f.count} graded items due this day`
         )
       );
     for (const it of d.items)

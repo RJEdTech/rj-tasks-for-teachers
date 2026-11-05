@@ -97,13 +97,14 @@ describe('views', () => {
       [{ course: C, assignments: [
         { id: '1', name: 'Quiz', published: true, due_at: new Date(2026, 9, 23, 8).toISOString(), points_possible: 20, grading_type: 'points', assignment_group_id: null },
         { id: '2', name: 'HW', published: true, due_at: new Date(2026, 9, 23, 23, 59).toISOString(), points_possible: 10, grading_type: 'points', assignment_group_id: null },
+        { id: '3', name: 'Reading', published: true, due_at: new Date(2026, 9, 23, 23, 59).toISOString(), points_possible: 10, grading_type: 'points', assignment_group_id: null },
       ] }],
       NOW
     );
     const el = weekView(days, true, NOW);
     expect(el.querySelectorAll('.day')).toHaveLength(7);
     expect(el.textContent).toContain('Tomorrow');
-    expect(el.textContent).toContain('ALGEBRA 1: 2 graded items due this day');
+    expect(el.textContent).toContain('ALGEBRA 1: 3 graded items due this day');
     expect(el.textContent).toContain("Canvas doesn't let teachers see");
   });
 });
