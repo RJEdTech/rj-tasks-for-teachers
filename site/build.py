@@ -13,7 +13,7 @@ sys.path.insert(0, HERE)
 from illustrations import ILL_DOWNLOAD, ILL_EXTRACT, ILL_ADDRESS, ILL_DEVMODE, ILL_LOAD, ILL_PIN  # noqa: E402
 
 VERSION = json.load(open(os.path.join(ROOT, "package.json")))["version"]
-UPDATED = "November 4, 2026"
+UPDATED = "November 5, 2026"
 ZIP = f"rj-tasks-for-teachers-{VERSION}.zip"
 FOLDER = f"rj-tasks-for-teachers-{VERSION}"
 FORM_URL = ("https://forms.cloud.microsoft/Pages/ResponsePage.aspx?"
