@@ -8,7 +8,9 @@
 <body class="popup">
 <header class="mast"><div class="mark" aria-hidden="true">RJ</div><div><h1>RJ Tasks for Teachers</h1><p>For Regis Jesuit Canvas</p></div></header>
 <main>
-<p class="help">Open your Canvas Dashboard and use the <strong>My Classes</strong> card at the top of the right sidebar. On other pages, click <strong>My Classes</strong> in the bottom-right corner.</p>
+<div class="power"><span class="power-label" id="power-label">RJ Tasks is <span id="power-state">on</span></span><button id="power" type="button" role="switch" aria-checked="true" aria-labelledby="power-label" disabled></button></div>
+<p class="help" id="off-note">It's off, so Canvas looks the way it does without it. Your settings are saved. Turn it back on any time here.</p>
+<p class="help" id="on-note">Open your Canvas Dashboard and use the <strong>My Classes</strong> card at the top of the right sidebar. On other pages, click <strong>My Classes</strong> in the bottom-right corner.</p>
 <a class="btn primary" id="open-canvas" href="https://rjhs.instructure.com/" target="_blank" rel="noopener noreferrer">Open Canvas</a>
 <button class="btn" id="open-settings" type="button">Settings</button>
 <a class="btn" id="feedback" href="#" target="_blank" rel="noopener noreferrer" hidden>Report a bug or request a feature</a>

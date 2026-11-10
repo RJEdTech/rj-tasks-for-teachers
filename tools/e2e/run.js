@@ -560,6 +560,60 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await setDark(false);
   await dp.close();
 
+  // ---------- on/off switch in the popup ----------
+  const op = await ctx.newPage();
+  watch(op);
+  await op.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await op.waitForSelector('div[data-rjtt-card]', { timeout: 15000 });
+  const opp = await ctx.newPage();
+  watch(opp);
+  await opp.setViewportSize({ width: 320, height: 380 });
+  await opp.goto(`chrome-extension://${extId}/popup.html`);
+  await opp.waitForSelector('#power:not([disabled])');
+  check('switch: starts on', (await opp.getAttribute('#power', 'aria-checked')) === 'true');
+  await sw.evaluate(() => chrome.storage.sync.set({ dark_canvas: true }));
+  await sleep(500);
+  const ourUi = () => op.evaluate(() => [...document.querySelectorAll('div[data-rjtt-card], div[data-rjtt]')].some((h) => {
+    const r = h.getBoundingClientRect();
+    const inner = h.shadowRoot && [...h.shadowRoot.querySelectorAll('*')].some((el) => el.getBoundingClientRect().height > 0);
+    return getComputedStyle(h).display !== 'none' && (r.height > 0 || inner);
+  }));
+  const opDark = () => op.evaluate(() => document.documentElement.classList.contains('rj-dark-canvas'));
+  const allBadges = () => sw.evaluate(async () => {
+    const tabs = await chrome.tabs.query({});
+    return [await chrome.action.getBadgeText({}), ...(await Promise.all(tabs.map((t) => chrome.action.getBadgeText({ tabId: t.id }))))];
+  });
+  for (let i = 0; i < 40 && !(await ourUi()); i++) await sleep(250); // the card fills in after the page loads
+  const shownBefore = [await ourUi(), await opDark()];
+  check('switch: card and dark mode showing before it is turned off', shownBefore.every(Boolean), JSON.stringify(shownBefore));
+  const writesBefore = writes.length;
+  await opp.click('#power');
+  await sleep(600);
+  await opp.screenshot({ path: path.join(OUT, '9-popup-off.png') });
+  check('switch: off hides the card and button at once, no reload', !(await ourUi()));
+  check('switch: off turns dark mode off too', !(await opDark()));
+  check('switch: popup says off', (await opp.getAttribute('#power', 'aria-checked')) === 'false' && (await opp.isVisible('#off-note')));
+  const offBadges = await allBadges();
+  check('switch: every tab and new tabs show OFF on the icon', offBadges.every((b) => b === 'OFF'), JSON.stringify(offBadges));
+  await op.reload({ waitUntil: 'domcontentloaded' });
+  await sleep(2500);
+  check('switch: nothing appears on a new page while off', (await op.locator('div[data-rjtt], div[data-rjtt-card]').count()) === 0 && !(await opDark()));
+  check('switch: still OFF after a Canvas page loads', (await allBadges()).every((b) => b === 'OFF'));
+  await opp.reload();
+  await opp.waitForSelector('#power:not([disabled])');
+  check('switch: stays off when the popup is opened again', (await opp.getAttribute('#power', 'aria-checked')) === 'false');
+  await opp.click('#power');
+  await op.waitForSelector('div[data-rjtt-card]', { timeout: 15000 });
+  await sleep(800);
+  check('switch: back on starts it on a page opened while off, no reload', (await ourUi()) && (await opDark()));
+  check('switch: no OFF left on the icon', (await allBadges()).every((b) => b !== 'OFF'), JSON.stringify(await allBadges()));
+  check('switch: dark mode setting was kept', (await sw.evaluate(() => chrome.storage.sync.get('dark_canvas'))).dark_canvas === true);
+  check('switch: turning it off and on changed nothing in Canvas', writes.length === writesBefore);
+  await opp.screenshot({ path: path.join(OUT, '10-popup-on.png') });
+  await sw.evaluate(() => chrome.storage.sync.set({ dark_canvas: false }));
+  await opp.close();
+  await op.close();
+
   check('no page errors in the dark mode checks', errors.length === 0 || errors.every((e) => e.includes('Failed to fetch')), errors.slice(0, 3).join(' | '));
   await ctx.close();
   const failed = results.filter((r) => !r.ok);

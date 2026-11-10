@@ -21,6 +21,8 @@ By default it only reads **this semester's academic classes**: courses in RJ's c
 
 Settings lets each teacher reorder the four views, choose which appear on the sidebar card, hide the card's summary, and turn individual checks off. The card, panel and settings link to the **Regis Jesuit Professional Development** course in Canvas for questions.
 
+**On/off switch:** at the top of the toolbar popup. Off hides the card, the My Classes button and dark mode right away, with no reload, puts OFF on the toolbar icon, and nothing runs on new pages until it's turned back on. Settings are kept. It's paused, not uninstalled.
+
 The card and button only appear for people who teach or TA a class this semester. The button stays out of SpeedGrader and the Gradebook unless turned on in Settings. The sidebar card never shows student names, only counts.
 
 ## Security and privacy design

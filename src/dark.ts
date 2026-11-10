@@ -5,7 +5,8 @@
   readable against its background as it was, then flips images, video and
   embeds back so they look as they were made. Images get a white sheet behind
   them so a transparent diagram with black lines stays visible. Printing is
-  never affected.
+  never affected. Turning RJ Tasks for Teachers off in the toolbar popup
+  turns dark mode off too, and back on with it.
 
   Pages where missing something would matter most (quizzes and grading) always
   stay light. Anywhere else, a bar at the bottom lets someone switch that page
@@ -13,6 +14,8 @@
   with this page's address (no query string) filled in. Nothing is sent unless
   the person submits the form.
 */
+import { OFF_KEY, onOffChanged } from './lib/onOff';
+
 export const DARK_KEY = 'dark_canvas'; // chrome.storage.sync, boolean
 const LIGHT_PAGES_KEY = 'dark_light_pages'; // chrome.storage.local, list of paths
 const MAX_LIGHT_PAGES = 300;
@@ -72,6 +75,7 @@ function start(): void {
   html.appendChild(style);
 
   let enabled = false;
+  let off = false;
   let lightPages: string[] = [];
   let bar: HTMLElement | null = null;
   const path = () => window.location.pathname;
@@ -147,16 +151,18 @@ function start(): void {
   const update = () => {
     const forced = staysLight(path(), document.title);
     const pageLight = lightPages.includes(path());
-    html.classList.toggle(CLASS_NAME, enabled && !forced && !pageLight);
-    if (enabled && !forced) drawBar(pageLight);
+    const on = enabled && !off;
+    html.classList.toggle(CLASS_NAME, on && !forced && !pageLight);
+    if (on && !forced) drawBar(pageLight);
     else {
       bar?.remove();
       bar = null;
     }
   };
 
-  chrome.storage.sync.get(DARK_KEY, (sync) => {
+  chrome.storage.sync.get([DARK_KEY, OFF_KEY], (sync) => {
     enabled = sync[DARK_KEY] === true;
+    off = sync[OFF_KEY] === true;
     chrome.storage.local.get(LIGHT_PAGES_KEY, (local) => {
       const saved = local[LIGHT_PAGES_KEY];
       lightPages = Array.isArray(saved) ? saved.filter((p) => typeof p === 'string') : [];
@@ -168,6 +174,10 @@ function start(): void {
       enabled = changes[DARK_KEY].newValue === true;
       update();
     }
+  });
+  onOffChanged((nowOff) => {
+    off = nowOff;
+    update();
   });
   // The body doesn't exist yet at this point, and New Quizzes changes the title
   // and address without loading a new page.
