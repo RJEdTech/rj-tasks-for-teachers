@@ -14,6 +14,7 @@ import { loadSettings, onSettingsChanged, Settings } from './lib/settings';
 import { Panel } from './ui/panel';
 import { isStudentView, loadOwner, ownedKey } from './lib/acting';
 import { SidebarCard, cardSlot, inSlot, isShown, clearCardCache, moveTodoUp } from './ui/card';
+import { isOff, onOffChanged } from './lib/onOff';
 
 const ROLE_KEY = 'rjtt-teaches-v2'; // sessionStorage: {v: 0|1, t} per filter, this tab only
 const ROLE_TTL_MS = 60 * 60 * 1000; // re-check hourly, so a new semester shows up without closing the tab
@@ -241,7 +242,36 @@ export async function start(): Promise<{ panel: Panel; card: SidebarCard | null 
   }
   showCachedBadge();
   panel.onGradeTotal = (n) => setBadge(n);
+
+  // The popup's on/off switch: hide everything at once, or bring it back.
+  const applyOff = (off: boolean) => {
+    for (const host of [panel.host, card?.host]) {
+      if (!host) continue;
+      if (off) host.style.setProperty('display', 'none', 'important');
+      else host.style.removeProperty('display');
+    }
+    if (!off) {
+      placeButton();
+      showCachedBadge();
+    }
+  };
+  onOffChanged(applyOff);
+  if (await isOff()) applyOff(true); // turned off while this was starting
   return { panel, card };
 }
 
-if (typeof chrome !== 'undefined' && chrome.runtime?.id) void start();
+/* Nothing starts while it's turned off; turning it on starts it on this page. */
+export async function boot(): Promise<void> {
+  let started = false;
+  const go = () => {
+    if (started) return;
+    started = true;
+    void start();
+  };
+  onOffChanged((off) => {
+    if (!off) go();
+  });
+  if (!(await isOff())) go();
+}
+
+if (typeof chrome !== 'undefined' && chrome.runtime?.id) void boot();
