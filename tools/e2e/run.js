@@ -308,6 +308,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const bg = await $('.panel').evaluate((e) => getComputedStyle(e).backgroundColor);
   check('dark mode: neutral charcoal panel', bg === 'rgb(21, 22, 26)', bg);
   await page.screenshot({ path: path.join(OUT, '5-dark.png') });
+  await tab('students');
+  await waitBody(/Students with at least/);
+  const selColors = await $('.summary select').evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor]);
+  check('dark mode: missing-count box is dark with light text', selColors[1] === 'rgb(21, 22, 26)' && selColors[0] === 'rgb(232, 233, 236)', selColors.join(' on '));
   await page.emulateMedia({ colorScheme: 'light' });
 
   // ---------- grading pages ----------

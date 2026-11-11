@@ -24,7 +24,8 @@ export const CSS = `
   }
 }
 button, select { font: inherit; color: inherit; }
-select { background: var(--bg); }
+/* Explicit colors so the native box follows the theme (it showed light text on white in dark mode). */
+select { background: var(--bg); color: var(--fg); color-scheme: light dark; border: 1px solid var(--line); border-radius: 4px; }
 /* Canvas dark mode flips the whole page. A panel already in dark colors flips
    back on itself. The filter can't go on the host: that would trap these
    fixed elements inside a zero-height box, off the screen. */
