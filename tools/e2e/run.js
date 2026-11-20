@@ -114,6 +114,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Dashboard card: "Questions?" links to the Canvas PD course', (await $c('.foot .setlink').count()) === 1 && (await $c('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
   check('Dashboard card: Students as a count only, never names', /4 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|Gray|img/.test(ct), ct);
   check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /assignments? due in the next 7 days/.test(ct));
+  {
+    // Red/White day, from the same table the extension ships (src/lib/rjDays.ts), for the laptop's date
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/lib/rjDays.ts'), 'utf8');
+    const list = (n) => [...src.split(`const ${n}`)[1].split('];')[0].matchAll(/'(\d{4}-\d{2}-\d{2})'/g)].map((m) => m[1]);
+    const k = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = list('RED_DAYS').includes(k(new Date())) ? 'Red' : list('WHITE_DAYS').includes(k(new Date())) ? 'White' : null;
+    const line = ((await $c('.dayline').textContent().catch(() => '')) || '').replace(/\s+/g, ' ');
+    check(
+      'Dashboard card: Red/White day line under the heading',
+      (today ? line.includes(`Today is a ${today} Day`) : !line.includes('Today is')) && / is a (Red|White) Day/.test(line.replace(/^Today is a \w+ Day/, '')),
+      line
+    );
+    const strip = await $c('.strip li').evaluateAll((ls) => ls.map((l) => (l.querySelector('.c') || {}).textContent || ''));
+    check('Dashboard card: Week strip labels today with its color', strip[0] === (today || ''), strip.join(','));
+  }
   check('Dashboard card: only this semester\'s classes', !/EDTECH|RAIDERQUEST|DEMO|THEOLOGY 1 S2/.test(ct));
   check('Dashboard: no floating button while the card is showing', !(await $('.launcher').isVisible()));
   await page.waitForFunction(() => {
@@ -339,7 +354,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await doneTab.locator('#done').click();
   await doneTab.waitForEvent('close', { timeout: 3000 }).catch(() => undefined);
   check('settings: Done closes the tab', doneTab.isClosed());
-  check('settings: jump links to each section', (await opt.locator('nav.jump a').count()) === 7);
+  check('settings: jump links to each section', (await opt.locator('nav.jump a').count()) === 8);
+  check('settings: Red and White days switch, on by default', await opt.locator('#showDayColor').isChecked());
   check('settings: every Check-up check has its own switch', (await opt.locator('#checks input[type=checkbox]').count()) === 19);
   await opt.locator('#classes label', { hasText: 'ADVISEMENT' }).locator('input').uncheck();
   await opt.waitForSelector('#saved:has-text("Saved")');

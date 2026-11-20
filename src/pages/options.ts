@@ -47,6 +47,10 @@ async function init(): Promise<void> {
   elsewhere.checked = settings.buttonElsewhere;
   elsewhere.addEventListener('change', () => void save({ ...settings, buttonElsewhere: elsewhere.checked }));
 
+  const days = document.getElementById('showDayColor') as HTMLInputElement;
+  days.checked = settings.showDayColor;
+  days.addEventListener('change', () => void save({ ...settings, showDayColor: days.checked }));
+
   const dark = document.getElementById('darkCanvas') as HTMLInputElement;
   chrome.storage.sync.get(DARK_KEY, (r) => (dark.checked = r[DARK_KEY] === true));
   dark.addEventListener('change', () => {
@@ -108,6 +112,7 @@ async function init(): Promise<void> {
     set('buttonElsewhere', s.buttonElsewhere);
     set('semesterOnly', !s.allClasses);
     set('cardCollapsed', s.cardCollapsed);
+    set('showDayColor', s.showDayColor);
     document.querySelectorAll<HTMLInputElement>('#threshold input').forEach((r) => (r.checked = Number(r.value) === s.missingThreshold));
     document.querySelectorAll<HTMLInputElement>('#classes input[data-course]').forEach((c) => (c.checked = !s.excludedCourses.includes(c.dataset.course!)));
     const active = document.activeElement as HTMLElement | null;
