@@ -27,6 +27,7 @@ export interface Settings {
   cardHidden: Section[]; // sections left out of the sidebar card (the panel keeps every tab)
   cardCollapsed: boolean; // the card's Hide button: just its header shows
   checksOff: string[]; // Check-up rules the teacher turned off
+  showDayColor: boolean; // Red/White day line on the card, and on each day of the week
 }
 
 export const DEFAULTS: Settings = {
@@ -40,6 +41,7 @@ export const DEFAULTS: Settings = {
   cardHidden: [],
   cardCollapsed: false,
   checksOff: [],
+  showDayColor: true,
 };
 
 const THRESHOLDS = [1, 2, 3, 4, 5];
@@ -67,6 +69,7 @@ export function clean(raw: unknown): Settings {
     checksOff: Array.isArray(r.checksOff)
       ? r.checksOff.filter((x): x is string => typeof x === 'string' && /^[a-z_]{1,30}$/.test(x)).slice(0, 50)
       : [],
+    showDayColor: typeof r.showDayColor === 'boolean' ? r.showDayColor : DEFAULTS.showDayColor,
   };
 }
 

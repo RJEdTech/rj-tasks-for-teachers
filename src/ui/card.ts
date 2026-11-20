@@ -22,6 +22,7 @@ import { Loader } from '../data/loader';
 import { GradingRow } from '../data/grading';
 import { WeekDay } from '../data/week';
 import { waitingFor } from '../lib/dates';
+import { DayColor, dayColor, dayColorLine } from '../lib/rjDays';
 import { CARD_CSS } from './styles';
 import { append, clear, h, plural } from './dom';
 import type { Tab } from './panel';
@@ -199,7 +200,7 @@ export class SidebarCard {
 
   /* What the card's contents depend on. */
   private layoutKey(s: Settings): string {
-    return [this.cacheKeyFor(s), s.sectionOrder.join(','), s.cardCollapsed].join('#');
+    return [this.cacheKeyFor(s), s.sectionOrder.join(','), s.cardCollapsed, s.showDayColor].join('#');
   }
 
   /* Always keeps the latest settings (so Hide can't save a stale copy);
@@ -349,6 +350,8 @@ export class SidebarCard {
         open
       )
     );
+    const day = this.dayLine();
+    if (day) this.wrap.append(day);
     if (had === 'hide') hide.focus();
     else if (had === 'open') open.focus();
     for (const tab of want) {
@@ -371,11 +374,26 @@ export class SidebarCard {
       );
   }
 
+  /* "Today is a Red Day · Tomorrow is a White Day", from the table inside
+     the extension (lib/rjDays.ts). Shown even when the card is hidden. */
+  private dayLine(): HTMLElement | null {
+    if (!this.opts.settings.showDayColor) return null;
+    const line = dayColorLine(this.now());
+    if (!line) return null;
+    const pill = (c: DayColor) => h('span', { class: `day-pill ${c === 'Red' ? 'red' : 'white'}` }, `${c} Day`);
+    const p = h('p', { class: 'dayline' });
+    if (line.today) p.append(h('span', {}, 'Today is a ', pill(line.today)));
+    if (line.next) p.append(h('span', {}, `${line.next.label} is a `, pill(line.next.color)));
+    return p;
+  }
+
   private message(msg: string): void {
     const head = this.wrap.querySelector('.head');
+    const day = this.wrap.querySelector('.dayline');
     clear(this.wrap);
     this.sections.clear();
     if (head) this.wrap.append(head);
+    if (day) this.wrap.append(day);
     this.wrap.append(h('p', { class: 'muted pad' }, msg));
   }
 
@@ -470,16 +488,18 @@ export class SidebarCard {
     w.days.forEach((d, i) => {
       const date = new Date(d.at);
       const name = i === 0 ? 'Today' : DAY_NAME.format(date);
+      const color = this.opts.settings.showDayColor ? dayColor(date) : null;
       strip.append(
         h(
           'li',
           {
             class: d.flagged ? 'flag' : d.n ? 'some' : '',
-            title: `${name}: ${plural(d.n, 'assignment')}${d.flagged ? ', 3+ graded assignments for one class' : ''}`,
+            title: `${name}${color ? `, ${color} Day` : ''}: ${plural(d.n, 'assignment')}${d.flagged ? ', 3+ graded assignments for one class' : ''}`,
           },
           h('span', { class: 'd', 'aria-hidden': 'true' }, i === 0 ? 'Today' : DAY_LETTER.format(date)),
+          color ? h('span', { class: `c${color === 'Red' ? ' red' : ''}`, 'aria-hidden': 'true' }, color) : null,
           h('span', { class: 'n', 'aria-hidden': 'true' }, String(d.n)),
-          h('span', { class: 'sr' }, `${name}, ${plural(d.n, 'assignment')}${d.flagged ? ', heavy day' : ''}`)
+          h('span', { class: 'sr' }, `${name}${color ? `, ${color} Day` : ''}, ${plural(d.n, 'assignment')}${d.flagged ? ', heavy day' : ''}`)
         )
       );
     });

@@ -6,6 +6,7 @@ import { GradingRow } from '../data/grading';
 import { Issue } from '../data/checkup';
 import { StudentRow } from '../data/students';
 import { ForecastDay, HEAVY_DAY, WeekDay } from '../data/week';
+import { dayColor } from '../lib/rjDays';
 import { TeacherCourse } from '../lib/types';
 import { h, plural } from './dom';
 
@@ -217,7 +218,7 @@ export function studentsView(opts: {
 
 const timeFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
 
-export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLElement {
+export function weekView(days: WeekDay[], showCourse: boolean, now: Date, showDayColor = true): HTMLElement {
   const box = h('div');
   const total = days.reduce((s, d) => s + d.items.length, 0);
   const flagged = days.filter((d) => d.flags.length).length;
@@ -231,10 +232,21 @@ export function weekView(days: WeekDay[], showCourse: boolean, now: Date): HTMLE
   );
   days.forEach((d, idx) => {
     const label = idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : d.date.toLocaleDateString('en-US', { weekday: 'long' });
+    const color = showDayColor ? dayColor(d.date) : null;
     const day = h(
       'div',
       { class: 'day' },
-      h('h4', {}, label, ' ', h('span', { class: 'muted' }, `${formatDay(d.date)} · ${plural(d.items.length, 'assignment')}`))
+      h(
+        'h4',
+        {},
+        label,
+        ' ',
+        h(
+          'span',
+          { class: 'muted' },
+          `${formatDay(d.date)}${color ? ` · ${color} Day` : ''} · ${plural(d.items.length, 'assignment')}`
+        )
+      )
     );
     for (const f of d.flags)
       day.append(

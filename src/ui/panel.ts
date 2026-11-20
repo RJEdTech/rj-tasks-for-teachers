@@ -140,7 +140,8 @@ export class Panel {
     else if (
       prev.missingThreshold !== s.missingThreshold ||
       prev.hideNames !== s.hideNames ||
-      prev.checksOff.join(',') !== s.checksOff.join(',')
+      prev.checksOff.join(',') !== s.checksOff.join(',') ||
+      prev.showDayColor !== s.showDayColor
     )
       void this.renderTab();
   }
@@ -371,7 +372,7 @@ export class Panel {
         ]);
         content = h('div');
         if (f) content.append(forecastView(f.value, courses, g ? g.value.reduce((s, x) => s + x.count, 0) : null));
-        content.append(weekView(r.value, showCourse, now));
+        content.append(weekView(r.value, showCourse, now, this.opts.settings.showDayColor));
         note = failedNote(r.failed, r.partial);
       }
     } catch {

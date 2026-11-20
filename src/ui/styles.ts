@@ -193,6 +193,14 @@ button { font: inherit; color: inherit; }
 .strip li.flag { background: #fdecef; box-shadow: inset 0 -3px 0 var(--red); }
 .strip .d { color: #5b6870; font-size: 11px; line-height: 14px; }
 .strip .n { font-size: 15px; font-weight: 700; line-height: 20px; color: var(--ink); }
+.strip .c { font-size: 10px; line-height: 12px; font-weight: 700; color: #5b6870; }
+.strip .c.red { color: #9b0d26; }
+
+/* Red/White day: the color's name is always written in the pill */
+.dayline { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 8px 0 0; font-size: 13px; line-height: 20px; color: var(--ink); }
+.day-pill { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 12px; line-height: 18px; font-weight: 700; white-space: nowrap; }
+.day-pill.red { color: #9b0d26; background: #fdecef; border: 1px solid #e8a3b0; }
+.day-pill.white { color: var(--ink); background: #fff; border: 1px solid #c7cdd1; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .foot { margin: 12px 0 0; color: var(--quiet); font-size: 12px; line-height: 15.6px; }
 .foot a { color: var(--link); text-decoration: none; }
