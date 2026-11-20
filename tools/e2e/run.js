@@ -112,7 +112,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('Dashboard card: rows link to SpeedGrader', (await $c('.list a').first().getAttribute('href')) === `${BASE}/courses/101/gradebook/speed_grader?assignment_id=1001`);
   check('Dashboard card: Check-up summary', /\d+ to fix · \d+ worth a look/.test(ct), ct);
   check('Dashboard card: "Questions?" links to the Canvas PD course', (await $c('.foot .setlink').count()) === 1 && (await $c('.foot a').getAttribute('href')) === `${BASE}/courses/5414`);
-  check('Dashboard card: Students as a count only, never names', /3 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|img/.test(ct), ct);
+  check('Dashboard card: Students as a count only, never names', /4 students with 3\+ missing/.test(ct) && !/Casey|Avery|Harper|Gray|img/.test(ct), ct);
   check('Dashboard card: Week strip of 7 days', (await $c('.strip li').count()) === 7 && /assignments? due in the next 7 days/.test(ct));
   check('Dashboard card: only this semester\'s classes', !/EDTECH|RAIDERQUEST|DEMO|THEOLOGY 1 S2/.test(ct));
   check('Dashboard: no floating button while the card is showing', !(await $('.launcher').isVisible()));
@@ -212,15 +212,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ---------- Students ----------
   await tab('students');
   t = await waitBody(/missing this grading period/);
-  check('Students: names hidden by default', !/Casey|Avery|Harper|img/.test(t) && /Names are hidden/.test(t), t.slice(0, 120));
-  check('Students: per-class count while hidden', /ALGEBRA 1\s*3 students/.test(t), t.slice(0, 200));
+  check('Students: names hidden by default', !/Casey|Avery|Harper|Gray|img/.test(t) && /Names are hidden/.test(t), t.slice(0, 120));
+  check('Students: per-class count while hidden', /ALGEBRA 1\s*4 students/.test(t), t.slice(0, 200));
   await page.screenshot({ path: path.join(OUT, '3-students-hidden.png') });
   await $('.privacy button').click();
   t = await waitBody(/Hide names/);
   const names = await $('.body details summary .plain').allTextContents();
   check(
-    'Students: most missing first; auto-graded missing work counts; excused and dropped do not',
-    names.length === 3 && /Test$/.test(names[0]) && names[1] === 'Casey Ellis' && names[2] === 'Harper Jones' && !/Dropped/.test(t),
+    'Students: most missing first; auto-graded missing work and typed-in zeros count; excused and dropped do not',
+    names.length === 4 && /Test$/.test(names[0]) && names[1] === 'Casey Ellis' && names[2] === 'Gray Ito' && names[3] === 'Harper Jones' && !/Dropped/.test(t),
     names.join(' | ')
   );
   const imgs = await page.evaluate(() => document.querySelector('div[data-rjtt]').shadowRoot.querySelectorAll('img').length);

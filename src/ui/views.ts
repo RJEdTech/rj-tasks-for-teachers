@@ -209,7 +209,7 @@ export function studentsView(opts: {
       )
     );
   }
-  box.append(h('p', { class: 'note' }, "Uses Canvas's Missing flag, so excused work and your own missing/late marks are respected."));
+  box.append(h('p', { class: 'note' }, "Counts Canvas's Missing flag plus any 0 you entered for online work that was never turned in. Excused work is left out."));
   return box;
 }
 

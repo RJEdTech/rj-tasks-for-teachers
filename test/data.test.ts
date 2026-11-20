@@ -1,7 +1,7 @@
 import { teacherCourses, isCurrentTeachingCourse, isSemesterTerm, isCurrentSemester, isShownCourse } from '../src/data/courses';
 import { buildQueue, queueFromCounts, sortQueue } from '../src/data/grading';
 import { runCheckup, sortIssues, activeWeeksOf } from '../src/data/checkup';
-import { buildStudents, currentPeriod, pastDueIds, studentsAsText, chunk } from '../src/data/students';
+import { buildStudents, countsAsMissing, currentPeriod, pastDueIds, studentsAsText, chunk } from '../src/data/students';
 import { buildWeek, buildForecast, needsTeacherGrading } from '../src/data/week';
 import { countWaiting } from '../src/data/grading';
 import { clean, normalizeOrder } from '../src/lib/settings';
@@ -405,6 +405,33 @@ describe('students to check on', () => {
     const own = buildStudents(ALG, users, [miss('u1', '1', { cached_due_date: at(7) })], assignments, 1);
     expect(own[0].missing[0].dueAt?.toISOString()).toBe(at(7));
     expect(buildStudents(ALG, users, [miss('u1', '1')], assignments, 3)).toEqual([]);
+  });
+
+  it('counts a 0 typed in for online work never turned in (RJ expects zeros)', () => {
+    const zero = (u: string, aid: string, o: Partial<CanvasSubmission> = {}): CanvasSubmission =>
+      miss(u, aid, { missing: false, workflow_state: 'graded', grade: '0', score: 0, ...o });
+    const onl = assignments.map((x) => ({ ...x, submission_types: ['online_upload'] }));
+    const rows = buildStudents(ALG, users, [zero('u1', '1'), zero('u1', '2'), miss('u1', '3')], onl, 3, NOW);
+    expect(rows.map((r) => [r.name, r.missing.length])).toEqual([['Avery Cole', 3]]);
+    // with no submission type set, a 0 is treated as a real score
+    expect(buildStudents(ALG, users, [zero('u1', '1'), zero('u1', '2'), miss('u1', '3')], assignments, 3, NOW)).toEqual([]);
+    const online = onl[0];
+    const yes = (s: CanvasSubmission, a = online) => countsAsMissing(s, a, NOW);
+    expect(yes(zero('u1', '1'))).toBe(true);
+    // not counted: turned in, excused, scored above 0, paper or no-submission work, 0-point, not graded
+    expect(yes(zero('u1', '1', { submitted_at: at(5), workflow_state: 'graded' }))).toBe(false);
+    expect(yes(zero('u1', '1', { workflow_state: 'pending_review' }))).toBe(false);
+    expect(yes(zero('u1', '1', { excused: true }))).toBe(false);
+    expect(yes(zero('u1', '1', { score: 7 }))).toBe(false);
+    expect(yes(zero('u1', '1', { score: null }))).toBe(false);
+    expect(yes(zero('u1', '1'), { ...online, submission_types: ['on_paper'] })).toBe(false);
+    expect(yes(zero('u1', '1'), { ...online, submission_types: ['none'] })).toBe(false);
+    expect(yes(zero('u1', '1'), { ...online, points_possible: 0 })).toBe(false);
+    expect(yes(zero('u1', '1'), { ...online, grading_type: 'not_graded' })).toBe(false);
+    // the student's own due date: an extension still in the future is not missing yet
+    expect(yes(zero('u1', '1', { cached_due_date: at(40) }))).toBe(false);
+    // Canvas's Missing flag still counts on paper work (the teacher's own mark)
+    expect(yes(miss('u1', '1'), { ...online, submission_types: ['on_paper'] })).toBe(true);
   });
 
   it('copies as plain text grouped by class', () => {

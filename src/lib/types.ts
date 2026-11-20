@@ -97,6 +97,7 @@ export interface CanvasSubmission {
   missing?: boolean;
   excused?: boolean | null;
   grade?: string | null;
+  score?: number | null;
   grade_matches_current_submission?: boolean | null;
   cached_due_date?: string | null; // this student's own due date (overrides applied)
 }

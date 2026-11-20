@@ -20,7 +20,8 @@ import { teacherCourses } from './courses';
 import { buildQueue, countWaiting, GradingRow, queueFromCounts, sortQueue } from './grading';
 import { addDays } from '../lib/dates';
 import { activeWeeksOf, Issue, runCheckup, sortIssues } from './checkup';
-import { buildStudents, chunk, currentPeriod, pastDueIds, StudentRow } from './students';
+import { buildStudents, chunk, countsAsMissing, currentPeriod, pastDueIds, StudentRow } from './students';
+import { byId } from './assignments';
 import { buildForecast, buildWeek, ForecastDay, WeekDay } from './week';
 
 const PARALLEL = 3;
@@ -248,7 +249,8 @@ export class Loader {
 
   /* Every submission Canvas flags Missing, whatever its state: Canvas's
      missing-submission policy grades missing work (state "graded") but keeps
-     the Missing flag, and so does a teacher's own "Missing" mark with a 0. */
+     the Missing flag, and so does a teacher's own "Missing" mark with a 0.
+     Plus a 0 typed in for online work never turned in (see countsAsMissing). */
   private missing(c: TeacherCourse): Promise<CourseMissing> {
     const id = assertId(c.id);
     return this.once(`m:${id}`, async () => {
@@ -259,6 +261,7 @@ export class Loader {
       ]);
       const ids = pastDueIds(assignments, period, this.now());
       const submissions: CanvasSubmission[] = [];
+      const map = byId(assignments);
       let partial = false;
       for (const part of chunk(ids, IDS_PER_REQUEST)) {
         const q = part.map((a) => `assignment_ids[]=${assertId(a)}`).join('&');
@@ -266,7 +269,7 @@ export class Loader {
           `/api/v1/courses/${id}/students/submissions?student_ids[]=all&enrollment_state=active&${q}&per_page=100`
         );
         partial ||= r.truncated;
-        submissions.push(...r.items.filter((s) => s.missing && !s.excused));
+        submissions.push(...r.items.filter((s) => countsAsMissing(s, map.get(String(s.assignment_id)), this.now())));
       }
       return { course: c, users, assignments, submissions, partial, periodKnown: !!period };
     });
@@ -284,7 +287,7 @@ export class Loader {
         const m = await this.missing(c);
         partial ||= m.partial;
         periodKnown &&= m.periodKnown;
-        return buildStudents(c, m.users, m.submissions, m.assignments, threshold);
+        return buildStudents(c, m.users, m.submissions, m.assignments, threshold, this.now());
       } catch {
         failed.push(c);
         return [];
