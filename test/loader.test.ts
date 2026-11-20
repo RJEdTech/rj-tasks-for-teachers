@@ -47,6 +47,23 @@ describe('Loader', () => {
     expect(q).toContain('assignment_ids[]=10');
   });
 
+  it('Students counts a 0 typed in for online work never turned in (Canvas drops Missing then)', async () => {
+    const online = assignments.map((a) => ({ ...a, submission_types: ['online_upload'] }));
+    route({
+      '/assignments': () => online,
+      '/users': () => users,
+      '/grading_periods': () => ({ grading_periods: [] }),
+      '/students/submissions': () => [
+        { assignment_id: '10', user_id: '2', workflow_state: 'graded', missing: false, submitted_at: null, score: 0, grade: '0' },
+        { assignment_id: '11', user_id: '2', workflow_state: 'graded', missing: false, submitted_at: null, score: 0, grade: '0' },
+        // turned in and scored 0: a real score, not missing
+        { assignment_id: '10', user_id: '1', workflow_state: 'graded', missing: false, submitted_at: past, score: 0, grade: '0' },
+      ],
+    });
+    const r = await new Loader(() => NOW).students([C], 2);
+    expect(r.value.map((s) => [s.name, s.missing.length])).toEqual([['Blake Diaz', 2]]);
+  });
+
   it('To grade leaves out submissions from students who are not active (dropped, Test Student)', async () => {
     route({
       '/assignments': () => assignments,

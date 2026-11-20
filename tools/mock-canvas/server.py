@@ -126,7 +126,7 @@ def submissions_for(cid, state, aids):
                                   "workflow_state": st, "submitted_at": kw.get("at"), "late": kw.get("late", False),
                                   "missing": kw.get("missing", False), "excused": kw.get("excused", False),
                                   "grade": kw.get("grade"), "grade_matches_current_submission": kw.get("gm", True),
-                                  "cached_due_date": kw.get("due")}
+                                  "cached_due_date": kw.get("due"), "score": kw.get("score")}
     out = []
     if cid == "101":
         for i, u in enumerate(users[:6]):
@@ -142,7 +142,10 @@ def submissions_for(cid, state, aids):
         for idx, alist in plan.items():
             for aid in alist:
                 out.append(S(users[idx], aid, "unsubmitted", missing=True))
-        out.append(S(users[7], 1002, "graded", missing=True, grade="0"))
+        out.append(S(users[7], 1002, "graded", missing=True, grade="0", score=0))
+        # Gray (6): the teacher typed a 0 for three never-turned-in HWs, so Canvas dropped Missing
+        for aid in (1002, 1003, 1004):
+            out.append(S(users[6], aid, "graded", missing=False, grade="0", score=0))
         out.append(S(users[9], 1003, "unsubmitted", missing=True, excused=True))
         out.append(S(users[1], 1004, "unsubmitted", missing=False))
         out.append(S(dropped, 1003, "unsubmitted", missing=True))

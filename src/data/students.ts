@@ -3,6 +3,11 @@
   assignments this grading period. "Missing" is Canvas's own flag on the
   submission, so it already accounts for each student's due date, excused
   work and any missing/late status the teacher set.
+
+  RJ expects a 0 for missing work, and Canvas drops its Missing flag as soon
+  as a teacher types a grade, even a 0. So a 0 on online work the student
+  never turned in, past their own due date, counts too (the same rule as
+  RJ Tasks for Students' Catch Up).
 */
 import {
   CanvasAssignment,
@@ -41,6 +46,37 @@ export function pastDueIds(
     .map((a) => String(a.id));
 }
 
+/* Ways a student turns work in through Canvas itself (matches RJ Tasks for
+   Students). Paper and "no submission" work has no online record, so a 0
+   there can be a real score and is left alone. */
+const ONLINE = new Set([
+  'online_upload',
+  'online_text_entry',
+  'online_url',
+  'media_recording',
+  'student_annotation',
+  'online_quiz',
+  'discussion_topic',
+  'external_tool', // e.g. VHL: a 0 there is real, undone work
+]);
+
+/* A 0 typed in for online work the student never turned in. */
+export function isTypedZero(s: CanvasSubmission, a: CanvasAssignment, now: Date): boolean {
+  if (s.excused || s.submitted_at) return false;
+  if (['submitted', 'pending_review'].includes(s.workflow_state)) return false;
+  if (s.score !== 0 || !((a.points_possible ?? 0) > 0) || !isGraded(a)) return false;
+  if (!(a.submission_types ?? []).some((t) => ONLINE.has(t))) return false;
+  const due = parse(s.cached_due_date ?? null) ?? parse(a.due_at);
+  return !!due && due < now;
+}
+
+/* Missing for this list: Canvas's Missing flag, or a typed-in 0 (above). */
+export function countsAsMissing(s: CanvasSubmission, a: CanvasAssignment | undefined, now: Date): boolean {
+  if (s.excused) return false;
+  if (s.missing) return true;
+  return !!a && isTypedZero(s, a, now);
+}
+
 export interface MissingItem {
   assignmentId: string;
   name: string;
@@ -60,17 +96,18 @@ export function buildStudents(
   users: CanvasUser[],
   submissions: CanvasSubmission[],
   assignments: CanvasAssignment[],
-  threshold: number
+  threshold: number,
+  now: Date = new Date()
 ): StudentRow[] {
   const people = new Map(users.map((u) => [String(u.id), u]));
   const map = byId(assignments);
   const rows = new Map<string, StudentRow>();
   const seen = new Set<string>();
   for (const s of submissions) {
-    if (!s.missing || s.excused) continue;
     const uid = String(s.user_id);
     const u = people.get(uid);
     const a = map.get(String(s.assignment_id));
+    if (!countsAsMissing(s, a, now)) continue;
     if (!u || !a) continue; // dropped students, Test Student, unknown assignments
     const once = `${uid}:${a.id}`;
     if (seen.has(once)) continue;
